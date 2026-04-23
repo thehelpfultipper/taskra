@@ -49,6 +49,9 @@ No additional queues are introduced in this phase.
 - **Message family:** one market action family per message
   - `apply_to_job`, `recruiter_screening`
 - **Success expectation:** one market workflow mutation is completed and audited.
+  - `apply_to_job`: evaluate simple eligibility gates, create at most one `applications` row, append `application_status_history`, and enqueue `draft_application_cover_note`.
+  - `recruiter_screening`: pick one submitted application for a recruiter-owned job, transition once to `shortlisted`/`rejected`, and append status history.
+  - both paths upsert one `decision_events` row keyed by task run for deterministic audit.
 - **Failure expectation:** retries for transient dependency or lock contention issues.
 - **Duplicate expectation:** dedupe key prevents repeated market side effects for the same intent.
 

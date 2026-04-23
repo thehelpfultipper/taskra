@@ -174,7 +174,7 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
 
   const { data: newJobs, error: newJobsError } = await client
     .from("jobs")
-    .select("id,created_at")
+    .select("id,org_id,created_at")
     .eq("status", "open")
     .gte("created_at", twentyMinutesAgo)
     .order("created_at", { ascending: false })
@@ -210,7 +210,7 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
 
   const { data: recentOpenJobs, error: recentOpenJobsError } = await client
     .from("jobs")
-    .select("id,created_at")
+    .select("id,org_id,created_at")
     .eq("status", "open")
     .gte("created_at", tenDaysAgo)
     .order("created_at", { ascending: false })
@@ -221,7 +221,7 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
 
   const { data: unscreenedApplications, error: unscreenedApplicationsError } = await client
     .from("applications")
-    .select("id,job_id,applicant_agent_id,created_at,jobs!inner(status)")
+    .select("id,job_id,applicant_agent_id,created_at,jobs!inner(id,org_id,status)")
     .eq("current_status", "submitted")
     .eq("jobs.status", "open")
     .order("created_at", { ascending: true })
@@ -232,12 +232,105 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
     );
   }
 
+  const candidateAgentIds = Array.from(
+    new Set([...(openToWorkPool ?? []).map((row) => row.agent_id), ...(recentlyOpenAgents ?? []).map((row) => row.agent_id)]),
+  );
+  const { data: candidateAgents, error: candidateAgentsError } =
+    candidateAgentIds.length > 0
+      ? await client
+          .from("agents")
+          .select("id,primary_org_id")
+          .in("id", candidateAgentIds)
+      : { data: [], error: null };
+  if (candidateAgentsError) {
+    throw new Error(`Failed to load candidate agents for market pulse: ${candidateAgentsError.message}`);
+  }
+
+  const { data: candidateObjectives, error: candidateObjectivesError } =
+    candidateAgentIds.length > 0
+      ? await client
+          .from("agent_objectives")
+          .select("agent_id,objective_type,status,archived_at,priority,created_at")
+          .in("agent_id", candidateAgentIds)
+          .eq("status", "active")
+          .is("archived_at", null)
+      : { data: [], error: null };
+  if (candidateObjectivesError) {
+    throw new Error(
+      `Failed to load candidate objectives for market pulse: ${candidateObjectivesError.message}`,
+    );
+  }
+
+  const objectiveByAgent = new Map<string, string>();
+  for (const objective of candidateObjectives ?? []) {
+    if (!objectiveByAgent.has(objective.agent_id)) {
+      objectiveByAgent.set(objective.agent_id, objective.objective_type);
+    }
+  }
+
+  const agentById = new Map(
+    (candidateAgents ?? []).map((agent) => [agent.id, { id: agent.id, primaryOrgId: agent.primary_org_id }]),
+  );
+  const eligibleOpenToWorkAgents = (openToWorkPool ?? []).filter((candidate) => {
+    const objectiveType = objectiveByAgent.get(candidate.agent_id);
+    return objectiveType === "open_to_work" || objectiveType === "passive_candidate";
+  });
+  const eligibleRecentlyOpenAgents = (recentlyOpenAgents ?? []).filter((candidate) => {
+    const objectiveType = objectiveByAgent.get(candidate.agent_id);
+    return objectiveType === "open_to_work" || objectiveType === "passive_candidate";
+  });
+
+  const { data: recruiterMemberships, error: recruiterMembershipsError } = await client
+    .from("org_memberships")
+    .select("org_id,user_id,role,status")
+    .eq("status", "active")
+    .in("role", ["owner", "admin", "recruiter"]);
+  if (recruiterMembershipsError) {
+    throw new Error(
+      `Failed to load recruiter memberships for market pulse: ${recruiterMembershipsError.message}`,
+    );
+  }
+
+  const recruiterOwnerIds = Array.from(new Set((recruiterMemberships ?? []).map((membership) => membership.user_id)));
+  const { data: recruiterAgents, error: recruiterAgentsError } =
+    recruiterOwnerIds.length > 0
+      ? await client
+          .from("agents")
+          .select("id,owner_user_id,primary_org_id")
+          .in("owner_user_id", recruiterOwnerIds)
+      : { data: [], error: null };
+  if (recruiterAgentsError) {
+    throw new Error(`Failed to load recruiter agents for market pulse: ${recruiterAgentsError.message}`);
+  }
+
+  const recruiterOwnersByOrg = new Map<string, Set<string>>();
+  for (const membership of recruiterMemberships ?? []) {
+    if (!recruiterOwnersByOrg.has(membership.org_id)) {
+      recruiterOwnersByOrg.set(membership.org_id, new Set());
+    }
+    recruiterOwnersByOrg.get(membership.org_id)?.add(membership.user_id);
+  }
+
+  function pickRecruiterAgentForOrg(orgId: string): string | null {
+    const owners = recruiterOwnersByOrg.get(orgId);
+    if (!owners || owners.size === 0) {
+      return null;
+    }
+    const candidates = (recruiterAgents ?? []).filter((agent) => owners.has(agent.owner_user_id));
+    const primaryOrgCandidate = candidates.find((agent) => agent.primary_org_id === orgId);
+    return (primaryOrgCandidate ?? candidates[0])?.id ?? null;
+  }
+
   const fromNewJobs: TaskRunInsert[] = [];
-  const newJobCandidateAgents = (openToWorkPool ?? []).slice(0, 12);
+  const newJobCandidateAgents = eligibleOpenToWorkAgents.slice(0, 12);
   for (const job of newJobs ?? []) {
-    for (const agent of newJobCandidateAgents.slice(0, 3)) {
+    for (const agent of newJobCandidateAgents.slice(0, 4)) {
       if (fromNewJobs.length >= 24) {
         break;
+      }
+      const profile = agentById.get(agent.agent_id);
+      if (profile?.primaryOrgId && profile.primaryOrgId === job.org_id) {
+        continue;
       }
       const dedupeKey = `pulse:market:new-job:${job.id}:${agent.agent_id}:${bucketIso}`;
       fromNewJobs.push({
@@ -256,6 +349,10 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
           context: {
             pulse: "market-10m",
             reason: "new-job",
+            matching: {
+              objectiveType: objectiveByAgent.get(agent.agent_id) ?? null,
+              simpleGate: "open_to_work + objective + not_primary_org",
+            },
           },
         },
       });
@@ -263,10 +360,14 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
   }
 
   const fromNewlyOpenToWorkAgents: TaskRunInsert[] = [];
-  for (const agent of recentlyOpenAgents ?? []) {
+  for (const agent of eligibleRecentlyOpenAgents) {
     for (const job of (recentOpenJobs ?? []).slice(0, 2)) {
       if (fromNewlyOpenToWorkAgents.length >= 20) {
         break;
+      }
+      const profile = agentById.get(agent.agent_id);
+      if (profile?.primaryOrgId && profile.primaryOrgId === job.org_id) {
+        continue;
       }
       const dedupeKey = `pulse:market:open-to-work:${agent.agent_id}:${job.id}:${bucketIso}`;
       fromNewlyOpenToWorkAgents.push({
@@ -285,18 +386,31 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
           context: {
             pulse: "market-10m",
             reason: "newly-open-to-work",
+            matching: {
+              objectiveType: objectiveByAgent.get(agent.agent_id) ?? null,
+              simpleGate: "open_to_work + objective + not_primary_org",
+            },
           },
         },
       });
     }
   }
 
-  const fromUnscreenedApplications: TaskRunInsert[] = (unscreenedApplications ?? []).map((application) => {
+  const fromUnscreenedApplications: TaskRunInsert[] = [];
+  for (const application of unscreenedApplications ?? []) {
+    const jobOrgId = application.jobs.org_id as string | undefined;
+    if (!jobOrgId) {
+      continue;
+    }
+    const recruiterAgentId = pickRecruiterAgentForOrg(jobOrgId);
+    if (!recruiterAgentId) {
+      continue;
+    }
     const dedupeKey = `pulse:market:unscreened:${application.id}:${bucketIso}`;
-    return {
+    fromUnscreenedApplications.push({
       queue_name: QUEUES.marketTasks,
       status: "queued",
-      agent_id: application.applicant_agent_id,
+      agent_id: recruiterAgentId,
       objective_id: null,
       dedupe_key: dedupeKey,
       attempts: 0,
@@ -304,16 +418,18 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
       scheduled_for: nowIso,
       payload: {
         ...getPayloadBase(QUEUES.marketTasks, "recruiter_screening", nowIso, dedupeKey),
-        agentId: application.applicant_agent_id,
+        agentId: recruiterAgentId,
         jobId: application.job_id,
         context: {
           pulse: "market-10m",
           reason: "unscreened-application",
           applicationId: application.id,
+          applicantAgentId: application.applicant_agent_id,
+          recruiterAgentId,
         },
       },
-    };
-  });
+    });
+  }
 
   return { fromNewJobs, fromNewlyOpenToWorkAgents, fromUnscreenedApplications };
 }

@@ -11,9 +11,11 @@ type BaseQueueMessage = {
   messageId: string;
   idempotencyKey: string;
   enqueuedAt: string;
+  producer?: string;
   queue: MvpQueueName;
   action: string;
   dedupeKey?: string;
+  context?: Record<string, unknown>;
 };
 
 export type AgentActivityMessage = BaseQueueMessage & {

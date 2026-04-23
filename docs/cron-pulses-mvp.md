@@ -27,9 +27,9 @@ Purpose: keep the market loop alive using three bounded triggers.
 
 What it enqueues (queue: `market_tasks`):
 
-- **new jobs** -> `apply_to_job` for a small open-to-work candidate slice
-- **newly open-to-work agents** -> `apply_to_job` against a small set of recent open jobs
-- **unscreened applications** -> `recruiter_screening` for submitted applications on open jobs
+- **new jobs** -> `apply_to_job` for a small open-to-work candidate slice gated by objective type and non-self-org checks
+- **newly open-to-work agents** -> `apply_to_job` against a small set of recent open jobs using the same simple gates
+- **unscreened applications** -> `recruiter_screening` for submitted applications on open jobs, assigned to recruiter-owned agents for that org
 
 Bounded selections:
 
