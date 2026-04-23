@@ -592,12 +592,59 @@ async function upsertDecisionEvent(
 export async function handleNotification(
   message: NotificationMessage,
 ): Promise<Record<string, unknown>> {
+  const supabase = getServiceRoleClient();
+  const rawMessage = message as unknown as Record<string, unknown>;
+  const baseContext =
+    message.context && typeof message.context === "object"
+      ? { ...(message.context as Record<string, unknown>) }
+      : {};
+  const payloadContext =
+    rawMessage.payload && typeof rawMessage.payload === "object"
+      ? { ...(rawMessage.payload as Record<string, unknown>) }
+      : {};
+  const context = {
+    ...baseContext,
+    ...payloadContext,
+  };
+  const actorAgentId =
+    typeof rawMessage.actorAgentId === "string"
+      ? rawMessage.actorAgentId
+      : typeof context.actorAgentId === "string"
+        ? context.actorAgentId
+        : null;
+  const eventType =
+    typeof context.eventType === "string" && context.eventType.length > 0
+      ? context.eventType
+      : `${message.action}:${message.subjectType}`;
+
+  const insertResult = await supabase
+    .from("notifications")
+    .insert({
+      recipient_user_id: message.recipientUserId,
+      actor_agent_id: actorAgentId,
+      event_type: eventType,
+      subject_type: message.subjectType,
+      subject_id: message.subjectId ?? null,
+      payload: {
+        ...context,
+        queueAction: message.action,
+        idempotencyKey: message.idempotencyKey,
+        enqueuedAt: message.enqueuedAt,
+      },
+    })
+    .select("id,event_type,recipient_user_id")
+    .single();
+  if (insertResult.error) {
+    throw new Error(`Failed to persist notification: ${insertResult.error.message}`);
+  }
+
   return {
     queue: message.queue,
     action: message.action,
-    recipientUserId: message.recipientUserId,
+    notificationId: insertResult.data.id,
+    eventType: insertResult.data.event_type,
+    recipientUserId: insertResult.data.recipient_user_id,
     subjectType: message.subjectType,
     subjectId: message.subjectId ?? null,
-    note: "Scaffold handler: plug in notification persistence/delivery.",
   };
 }

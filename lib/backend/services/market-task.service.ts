@@ -6,6 +6,7 @@ import { MVP_QUEUES } from "@/lib/backend/database/schema";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { type MarketTaskMessage } from "@/lib/backend/queues/contracts";
 import { TaskRunStore, type TaskRunRecord } from "@/lib/backend/queues/task-run-store";
+import { CredibilityService } from "@/lib/backend/services/credibility.service";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 
 type DecisionOutcome = "executed" | "no_op" | "skipped" | "failed";
@@ -60,7 +61,7 @@ type MatchEvaluation = {
 };
 
 type ScreeningEvaluation = {
-  nextStatus: "shortlisted" | "rejected";
+  nextStatus: "shortlisted" | "in_review" | "rejected";
   score: number;
   threshold: number;
   checks: Array<{ key: string; passed: boolean; weight: number; note: string }>;
@@ -113,9 +114,11 @@ function buildOverlap(profileText: string, jobText: string): string[] {
 
 export class MarketTaskService {
   private readonly producer: QueueProducerService;
+  private readonly credibility: CredibilityService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
+    this.credibility = new CredibilityService(this.supabase);
   }
 
   async processTask(
@@ -249,6 +252,26 @@ export class MarketTaskService {
       },
     });
 
+    if (job.created_by_user_id !== agent.owner_user_id) {
+      await this.producer.enqueueNotification({
+        queue: MVP_QUEUES.notifications,
+        action: "deliver_market",
+        recipientUserId: job.created_by_user_id,
+        actorAgentId: agent.id,
+        subjectType: "application",
+        subjectId: application.id,
+        producer: "market-task",
+        dedupeKey: `market:application_submitted:${application.id}`,
+        payload: {
+          eventType: "application_submitted",
+          applicationId: application.id,
+          jobId: job.id,
+          applicantAgentId: agent.id,
+          status: "submitted",
+        },
+      });
+    }
+
     const rationale = `Application submitted from explainable match score ${match.score}/${match.threshold}.`;
     await this.persistDecisionEvent({
       taskRun,
@@ -377,6 +400,29 @@ export class MarketTaskService {
     }
 
     const rationale = `Screened application using deterministic checks (${screening.score}/${screening.threshold}).`;
+    const applicantOwnerUserId = await this.loadAgentOwnerUserId(application.applicant_agent_id);
+    if (applicantOwnerUserId !== recruiterAgent.owner_user_id) {
+      await this.producer.enqueueNotification({
+        queue: MVP_QUEUES.notifications,
+        action: "deliver_market",
+        recipientUserId: applicantOwnerUserId,
+        actorAgentId: recruiterAgent.id,
+        subjectType: "application",
+        subjectId: application.id,
+        producer: "market-task",
+        dedupeKey: `market:application_status:${application.id}:${screening.nextStatus}`,
+        payload: {
+          eventType: "application_status_changed",
+          applicationId: application.id,
+          jobId: job.id,
+          previousStatus: "submitted",
+          nextStatus: screening.nextStatus,
+          reviewerAgentId: recruiterAgent.id,
+        },
+      });
+    }
+    await this.credibility.refreshAgent(application.applicant_agent_id);
+
     await this.persistDecisionEvent({
       taskRun,
       agentId: recruiterAgent.id,
@@ -552,11 +598,14 @@ export class MarketTaskService {
     }
 
     const threshold = 3;
-    const nextStatus: "shortlisted" | "rejected" = score >= threshold ? "shortlisted" : "rejected";
+    const nextStatus: "shortlisted" | "in_review" | "rejected" =
+      score >= threshold + 1 ? "shortlisted" : score >= threshold - 1 ? "in_review" : "rejected";
     const rationale =
       nextStatus === "shortlisted"
         ? `Shortlisted with deterministic screening score ${score}/${threshold}.`
-        : `Rejected with deterministic screening score ${score}/${threshold}.`;
+        : nextStatus === "in_review"
+          ? `Moved to in-review with deterministic screening score ${score}/${threshold}.`
+          : `Rejected with deterministic screening score ${score}/${threshold}.`;
 
     return {
       nextStatus,
@@ -692,7 +741,7 @@ export class MarketTaskService {
   private async transitionApplicationStatus(input: {
     applicationId: string;
     fromStatus: "submitted";
-    toStatus: "shortlisted" | "rejected";
+    toStatus: "shortlisted" | "in_review" | "rejected";
     note: string;
   }): Promise<boolean> {
     const { data, error } = await this.supabase
@@ -776,6 +825,14 @@ export class MarketTaskService {
       throw new Error(`Failed to count endorsements for ${agentId}: ${error.message}`);
     }
     return count ?? 0;
+  }
+
+  private async loadAgentOwnerUserId(agentId: string): Promise<string> {
+    const { data, error } = await this.supabase.from("agents").select("owner_user_id").eq("id", agentId).single();
+    if (error) {
+      throw new Error(`Failed to load owner user for agent ${agentId}: ${error.message}`);
+    }
+    return data.owner_user_id as string;
   }
 
   private async loadCoverNoteLength(applicationId: string): Promise<number> {

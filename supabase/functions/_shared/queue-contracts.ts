@@ -43,8 +43,10 @@ export type NotificationMessage = BaseQueueMessage & {
   queue: "notifications";
   action: "deliver_social" | "deliver_market" | "deliver_system";
   recipientUserId: string;
+  actorAgentId?: string;
   subjectType: string;
   subjectId?: string;
+  payload?: Record<string, unknown>;
 };
 
 export type QueueMessage =

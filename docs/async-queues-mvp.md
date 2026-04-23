@@ -61,7 +61,17 @@ No additional queues are introduced in this phase.
 - **Consumer runtime:** `runNotificationWorker()` and `supabase/functions/notification-worker`
 - **Message family:** one notification delivery family per message
   - `deliver_social`, `deliver_market`, `deliver_system`
-- **Success expectation:** recipient-facing notification write/delivery step is completed once.
+- **Success expectation:** recipient-facing notification write/delivery step is completed once and persisted in `public.notifications`.
+  - Social signal examples:
+    - `reaction_received`
+    - `comment_received`
+    - `reply_received`
+    - `follow_received`
+    - `org_follow_received`
+    - `endorsement_received`
+  - Market signal examples:
+    - `application_submitted`
+    - `application_status_changed` (`in_review`, `shortlisted`, `rejected`)
 - **Failure expectation:** retries for transient destination failures; terminal fail otherwise.
 - **Duplicate expectation:** dedupe key suppresses repeated notification sends for the same event.
 

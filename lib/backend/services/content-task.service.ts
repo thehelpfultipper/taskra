@@ -2,7 +2,10 @@ import "server-only";
 
 import { type SupabaseClient } from "@supabase/supabase-js";
 
+import { MVP_QUEUES } from "@/lib/backend/database/schema";
 import { type ContentTaskMessage } from "@/lib/backend/queues/contracts";
+import { QueueProducerService } from "@/lib/backend/queues/producers";
+import { TaskRunStore } from "@/lib/backend/queues/task-run-store";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 import {
   ContentGenerationService,
@@ -25,6 +28,7 @@ type AgentRow = {
 
 type PostRow = {
   id: string;
+  author_agent_id: string;
   body: string;
 };
 
@@ -66,6 +70,7 @@ function resolveTargetPostId(taskContext: Record<string, unknown>, decisionEvent
   const directTarget = asRecord(taskContext.target);
   const directTargetPostId =
     asString(taskContext.postId) ??
+    (asString(directTarget.kind) === "comment" ? asString(directTarget.postId) : null) ??
     (asString(directTarget.kind) === "post" ? asString(directTarget.postId) : null);
   if (directTargetPostId) {
     return directTargetPostId;
@@ -76,7 +81,30 @@ function resolveTargetPostId(taskContext: Record<string, unknown>, decisionEvent
   }
   const digest = asRecord(decisionEvent.context_digest);
   const selectedTarget = asRecord(digest.selectedTarget);
+  if (asString(selectedTarget.kind) === "comment") {
+    return asString(selectedTarget.postId);
+  }
   return asString(selectedTarget.kind) === "post" ? asString(selectedTarget.postId) : null;
+}
+
+function resolveTargetParentCommentId(
+  taskContext: Record<string, unknown>,
+  decisionEvent: DecisionEventRow | null,
+): string | null {
+  const directTarget = asRecord(taskContext.target);
+  const directTargetCommentId =
+    asString(taskContext.parentCommentId) ??
+    (asString(directTarget.kind) === "comment" ? asString(directTarget.commentId) : null);
+  if (directTargetCommentId) {
+    return directTargetCommentId;
+  }
+
+  if (!decisionEvent) {
+    return null;
+  }
+  const digest = asRecord(decisionEvent.context_digest);
+  const selectedTarget = asRecord(digest.selectedTarget);
+  return asString(selectedTarget.kind) === "comment" ? asString(selectedTarget.commentId) : null;
 }
 
 function resolveApplicationRef(taskContext: Record<string, unknown>): {
@@ -92,10 +120,12 @@ function resolveApplicationRef(taskContext: Record<string, unknown>): {
 export class ContentTaskService {
   private readonly generator: ContentGenerationService;
   private readonly supabase: SupabaseClient<any>;
+  private readonly producer: QueueProducerService;
 
   constructor(client?: SupabaseClient<any>, generator?: ContentGenerationService) {
     this.supabase = (client ?? createSupabaseServiceRoleClient()) as SupabaseClient<any>;
     this.generator = generator ?? new ContentGenerationService();
+    this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
   }
 
   async processTask(message: ContentTaskMessage, taskRunId: string): Promise<{
@@ -147,6 +177,7 @@ export class ContentTaskService {
       }
 
       const targetPost = await this.loadPost(targetPostId);
+      const parentCommentId = resolveTargetParentCommentId(taskContext, decisionEvent);
       const input: ContentGenerationInput = {
         kind: "comment",
         agent: {
@@ -165,16 +196,24 @@ export class ContentTaskService {
         .from("comments")
         .insert({
           post_id: targetPost.id,
+          parent_comment_id: parentCommentId,
           author_agent_id: agent.id,
           body: generation.text,
         })
-        .select("id,post_id")
+        .select("id,post_id,parent_comment_id")
         .single();
       if (error) {
         throw new Error(`Failed to persist generated comment: ${error.message}`);
       }
 
       const artifact: ContentArtifact = { type: "comment", id: data.id as string, postId: data.post_id as string };
+      await this.enqueueCommentNotification({
+        commentId: data.id as string,
+        postId: data.post_id as string,
+        parentCommentId: (data.parent_comment_id as string | null) ?? null,
+        actorAgentId: agent.id,
+        postAuthorAgentId: targetPost.author_agent_id,
+      });
       await this.attachSourceLink(message.sourceEventId, taskRunId, message.action, artifact, generation);
       return { artifact, generation, sourceEventId: message.sourceEventId };
     }
@@ -258,7 +297,7 @@ export class ContentTaskService {
   private async loadPost(postId: string): Promise<PostRow> {
     const { data, error } = await this.supabase
       .from("posts")
-      .select("id,body")
+      .select("id,author_agent_id,body")
       .eq("id", postId)
       .is("deleted_at", null)
       .single();
@@ -266,6 +305,79 @@ export class ContentTaskService {
       throw new Error(`Failed to load post ${postId} for comment generation: ${error.message}`);
     }
     return data as PostRow;
+  }
+
+  private async enqueueCommentNotification(input: {
+    commentId: string;
+    postId: string;
+    parentCommentId: string | null;
+    actorAgentId: string;
+    postAuthorAgentId: string;
+  }): Promise<void> {
+    const actorOwnerUserId = await this.loadAgentOwnerUserId(input.actorAgentId);
+    const postAuthorOwnerUserId = await this.loadAgentOwnerUserId(input.postAuthorAgentId);
+
+    if (postAuthorOwnerUserId !== actorOwnerUserId) {
+      await this.producer.enqueueNotification({
+        queue: MVP_QUEUES.notifications,
+        action: "deliver_social",
+        recipientUserId: postAuthorOwnerUserId,
+        actorAgentId: input.actorAgentId,
+        subjectType: "comment",
+        subjectId: input.commentId,
+        producer: "content-task",
+        dedupeKey: `social:comment:${input.commentId}:post_author`,
+        payload: {
+          eventType: "comment_received",
+          postId: input.postId,
+          parentCommentId: input.parentCommentId,
+          targetAgentId: input.postAuthorAgentId,
+        },
+      });
+    }
+
+    if (input.parentCommentId) {
+      const parentAuthorAgentId = await this.loadCommentAuthorAgentId(input.parentCommentId);
+      const parentAuthorOwnerUserId = await this.loadAgentOwnerUserId(parentAuthorAgentId);
+      if (parentAuthorOwnerUserId !== actorOwnerUserId) {
+        await this.producer.enqueueNotification({
+          queue: MVP_QUEUES.notifications,
+          action: "deliver_social",
+          recipientUserId: parentAuthorOwnerUserId,
+          actorAgentId: input.actorAgentId,
+          subjectType: "comment",
+          subjectId: input.commentId,
+          producer: "content-task",
+          dedupeKey: `social:reply:${input.commentId}:parent_author`,
+          payload: {
+            eventType: "reply_received",
+            postId: input.postId,
+            parentCommentId: input.parentCommentId,
+            targetAgentId: parentAuthorAgentId,
+          },
+        });
+      }
+    }
+  }
+
+  private async loadAgentOwnerUserId(agentId: string): Promise<string> {
+    const { data, error } = await this.supabase.from("agents").select("owner_user_id").eq("id", agentId).single();
+    if (error) {
+      throw new Error(`Failed to load owner for agent ${agentId}: ${error.message}`);
+    }
+    return data.owner_user_id as string;
+  }
+
+  private async loadCommentAuthorAgentId(commentId: string): Promise<string> {
+    const { data, error } = await this.supabase
+      .from("comments")
+      .select("author_agent_id")
+      .eq("id", commentId)
+      .single();
+    if (error) {
+      throw new Error(`Failed to load comment author for ${commentId}: ${error.message}`);
+    }
+    return data.author_agent_id as string;
   }
 
   private async resolveApplication(

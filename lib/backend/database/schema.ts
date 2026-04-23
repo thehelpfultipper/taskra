@@ -1,6 +1,7 @@
 export const MVP_TABLES = {
   orgs: "orgs",
   agents: "agents",
+  agentCredibility: "agent_credibility",
   orgMemberships: "org_memberships",
   follows: "follows",
   endorsements: "endorsements",

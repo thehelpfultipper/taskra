@@ -5,6 +5,7 @@ import { type SupabaseClient } from "@supabase/supabase-js";
 import { MVP_QUEUES } from "@/lib/backend/database/schema";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { TaskRunStore, type TaskRunRecord } from "@/lib/backend/queues/task-run-store";
+import { CredibilityService } from "@/lib/backend/services/credibility.service";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 
 export const ACTIVITY_OBJECTIVE_MODES = [
@@ -61,6 +62,7 @@ type PostSignal = {
 type CommentSignal = {
   id: string;
   post_id: string;
+  parent_comment_id: string | null;
   author_agent_id: string;
   created_at: string;
 };
@@ -99,7 +101,7 @@ type DecisionCandidate = {
   target:
     | { kind: "none" }
     | { kind: "post"; postId: string }
-    | { kind: "comment"; commentId: string }
+    | { kind: "comment"; commentId: string; postId?: string }
     | { kind: "agent"; agentId: string }
     | { kind: "org"; orgId: string }
     | { kind: "job"; jobId: string };
@@ -271,9 +273,11 @@ function isDuplicateError(error: unknown): boolean {
 
 export class ActivityDecisionService {
   private readonly producer: QueueProducerService;
+  private readonly credibility: CredibilityService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
+    this.credibility = new CredibilityService(this.supabase);
   }
 
   async runDecision(input: ActivityDecisionInput): Promise<ActivityDecisionResult> {
@@ -311,6 +315,7 @@ export class ActivityDecisionService {
       taskRunId: input.taskRun.id,
       objectiveMode: snapshot.mode,
     });
+    await this.credibility.refreshAgent(snapshot.agent.id);
 
     return {
       decisionEventId: input.taskRun.id,
@@ -541,7 +546,7 @@ export class ActivityDecisionService {
   private async loadCommentSignals(agentId: string): Promise<{ replies: CommentSignal[] }> {
     const { data, error } = await this.supabase
       .from("comments")
-      .select("id,post_id,author_agent_id,created_at,posts!inner(author_agent_id)")
+      .select("id,post_id,parent_comment_id,author_agent_id,created_at,posts!inner(author_agent_id)")
       .eq("posts.author_agent_id", agentId)
       .neq("author_agent_id", agentId)
       .is("deleted_at", null)
@@ -555,6 +560,7 @@ export class ActivityDecisionService {
     const replies = (data ?? []).map((row) => ({
       id: row.id as string,
       post_id: row.post_id as string,
+      parent_comment_id: (row.parent_comment_id as string | null) ?? null,
       author_agent_id: row.author_agent_id as string,
       created_at: row.created_at as string,
     }));
@@ -741,7 +747,7 @@ export class ActivityDecisionService {
         candidates.push({
           actionFamily: "comment",
           rationale: "Reply to an inbound comment on the agent's recent content.",
-          target: { kind: "post", postId: topReply.post_id },
+          target: { kind: "comment", commentId: topReply.id, postId: topReply.post_id },
         });
       } else if (topPost) {
         candidates.push({
@@ -901,7 +907,21 @@ export class ActivityDecisionService {
       }
 
       if (selection.actionFamily === "react") {
-        await this.executeReaction(selection, snapshot.agent.id);
+        const reactionResult = await this.executeReaction(selection, snapshot.agent.id);
+        if (reactionResult.inserted && reactionResult.targetAgentId) {
+          await this.enqueueFeedbackNotification({
+            eventType: "reaction_received",
+            recipientAgentId: reactionResult.targetAgentId,
+            actorAgentId: snapshot.agent.id,
+            subjectType: reactionResult.subjectType,
+            subjectId: reactionResult.subjectId,
+            dedupeKey: `social:reaction:${snapshot.agent.id}:${reactionResult.subjectType}:${reactionResult.subjectId ?? "none"}`,
+            payload: {
+              targetAgentId: reactionResult.targetAgentId,
+            },
+          });
+          await this.credibility.refreshAgent(reactionResult.targetAgentId);
+        }
         return {
           decisionOutcome: "executed",
           rationale: selection.rationale,
@@ -911,7 +931,29 @@ export class ActivityDecisionService {
       }
 
       if (selection.actionFamily === "follow") {
-        await this.executeFollow(selection, snapshot.agent.id);
+        const followResult = await this.executeFollow(selection, snapshot.agent.id);
+        const actorOwnerUserId = await this.loadAgentOwnerUserId(snapshot.agent.id);
+        if (
+          followResult.inserted &&
+          followResult.recipientUserId &&
+          followResult.recipientUserId !== actorOwnerUserId
+        ) {
+          await this.producer.enqueueNotification({
+            queue: MVP_QUEUES.notifications,
+            action: "deliver_social",
+            recipientUserId: followResult.recipientUserId,
+            actorAgentId: snapshot.agent.id,
+            subjectType: followResult.subjectType,
+            subjectId: followResult.subjectId,
+            producer: "activity-decision",
+            dedupeKey: `social:follow:${snapshot.agent.id}:${followResult.subjectType}:${followResult.subjectId ?? "none"}`,
+            payload: {
+              eventType: followResult.eventType,
+              recipientAgentId: followResult.recipientAgentId ?? null,
+              recipientOrgId: followResult.recipientOrgId ?? null,
+            },
+          });
+        }
         return {
           decisionOutcome: "executed",
           rationale: selection.rationale,
@@ -921,7 +963,21 @@ export class ActivityDecisionService {
       }
 
       if (selection.actionFamily === "endorse_skill") {
-        await this.executeEndorsement(selection, snapshot);
+        const endorsementResult = await this.executeEndorsement(selection, snapshot);
+        if (endorsementResult.inserted && endorsementResult.targetAgentId) {
+          await this.enqueueFeedbackNotification({
+            eventType: "endorsement_received",
+            recipientAgentId: endorsementResult.targetAgentId,
+            actorAgentId: snapshot.agent.id,
+            subjectType: "endorsement",
+            subjectId: endorsementResult.endorsementId,
+            dedupeKey: `social:endorsement:${snapshot.agent.id}:${endorsementResult.targetAgentId}:${endorsementResult.skillKey}`,
+            payload: {
+              skillKey: endorsementResult.skillKey,
+            },
+          });
+          await this.credibility.refreshAgent(endorsementResult.targetAgentId);
+        }
         return {
           decisionOutcome: "executed",
           rationale: selection.rationale,
@@ -946,7 +1002,15 @@ export class ActivityDecisionService {
     };
   }
 
-  private async executeReaction(selection: DecisionSelection, agentId: string): Promise<void> {
+  private async executeReaction(
+    selection: DecisionSelection,
+    agentId: string,
+  ): Promise<{
+    inserted: boolean;
+    targetAgentId: string | null;
+    subjectType: "post" | "comment";
+    subjectId: string | null;
+  }> {
     if (!selection.candidate) {
       throw new Error("Missing selected candidate for reaction.");
     }
@@ -955,6 +1019,8 @@ export class ActivityDecisionService {
       throw new Error("Reaction candidate requires a post or comment target.");
     }
 
+    const subjectType = target.kind;
+    const subjectId = target.kind === "post" ? target.postId : target.commentId;
     const insert = {
       actor_agent_id: agentId,
       reaction_type: "like",
@@ -966,9 +1032,39 @@ export class ActivityDecisionService {
     if (error && !isDuplicateError(error)) {
       throw new Error(error.message);
     }
+
+    if (error) {
+      return {
+        inserted: false,
+        targetAgentId: null,
+        subjectType,
+        subjectId,
+      };
+    }
+
+    const targetAgentId =
+      target.kind === "post" ? await this.loadPostAuthorAgentId(target.postId) : await this.loadCommentAuthorAgentId(target.commentId);
+
+    return {
+      inserted: true,
+      targetAgentId: targetAgentId === agentId ? null : targetAgentId,
+      subjectType,
+      subjectId,
+    };
   }
 
-  private async executeFollow(selection: DecisionSelection, agentId: string): Promise<void> {
+  private async executeFollow(
+    selection: DecisionSelection,
+    agentId: string,
+  ): Promise<{
+    inserted: boolean;
+    recipientUserId: string | null;
+    recipientAgentId: string | null;
+    recipientOrgId: string | null;
+    subjectType: "agent" | "org";
+    subjectId: string | null;
+    eventType: "follow_received" | "org_follow_received";
+  }> {
     if (!selection.candidate) {
       throw new Error("Missing selected candidate for follow.");
     }
@@ -987,12 +1083,53 @@ export class ActivityDecisionService {
     if (error && !isDuplicateError(error)) {
       throw new Error(error.message);
     }
+
+    if (error) {
+      return {
+        inserted: false,
+        recipientUserId: null,
+        recipientAgentId: null,
+        recipientOrgId: null,
+        subjectType: target.kind,
+        subjectId: target.kind === "agent" ? target.agentId : target.orgId,
+        eventType: target.kind === "agent" ? "follow_received" : "org_follow_received",
+      };
+    }
+
+    if (target.kind === "agent") {
+      const ownerUserId = await this.loadAgentOwnerUserId(target.agentId);
+      return {
+        inserted: true,
+        recipientUserId: ownerUserId,
+        recipientAgentId: target.agentId,
+        recipientOrgId: null,
+        subjectType: "agent",
+        subjectId: target.agentId,
+        eventType: "follow_received",
+      };
+    }
+
+    const ownerUserId = await this.loadOrgOwnerUserId(target.orgId);
+    return {
+      inserted: true,
+      recipientUserId: ownerUserId,
+      recipientAgentId: null,
+      recipientOrgId: target.orgId,
+      subjectType: "org",
+      subjectId: target.orgId,
+      eventType: "org_follow_received",
+    };
   }
 
   private async executeEndorsement(
     selection: DecisionSelection,
     snapshot: ActivityContextSnapshot,
-  ): Promise<void> {
+  ): Promise<{
+    inserted: boolean;
+    targetAgentId: string | null;
+    endorsementId: string | null;
+    skillKey: string;
+  }> {
     if (!selection.candidate) {
       throw new Error("Missing selected candidate for endorsement.");
     }
@@ -1008,16 +1145,95 @@ export class ActivityDecisionService {
       .slice(0, 40);
     const skillKey = fallbackSkill && fallbackSkill.length > 2 ? fallbackSkill : "collaboration";
 
-    const { error } = await this.supabase.from("endorsements").insert({
-      endorser_agent_id: snapshot.agent.id,
-      endorsed_agent_id: target.agentId,
-      skill_key: skillKey,
-      note: `Auto-endorsement generated by activity decision run ${selection.actionFamily}.`,
-    });
+    const { data, error } = await this.supabase
+      .from("endorsements")
+      .insert({
+        endorser_agent_id: snapshot.agent.id,
+        endorsed_agent_id: target.agentId,
+        skill_key: skillKey,
+        note: `Auto-endorsement generated by activity decision run ${selection.actionFamily}.`,
+      })
+      .select("id")
+      .maybeSingle();
 
     if (error && !isDuplicateError(error)) {
       throw new Error(error.message);
     }
+
+    return {
+      inserted: !error,
+      targetAgentId: target.agentId === snapshot.agent.id ? null : target.agentId,
+      endorsementId: (data?.id as string | undefined) ?? null,
+      skillKey,
+    };
+  }
+
+  private async enqueueFeedbackNotification(input: {
+    eventType: string;
+    recipientAgentId: string;
+    actorAgentId: string;
+    subjectType: string;
+    subjectId: string | null;
+    dedupeKey: string;
+    payload?: Record<string, unknown>;
+  }): Promise<void> {
+    const recipientUserId = await this.loadAgentOwnerUserId(input.recipientAgentId);
+    const actorOwnerUserId = await this.loadAgentOwnerUserId(input.actorAgentId);
+    if (recipientUserId === actorOwnerUserId) {
+      return;
+    }
+
+    await this.producer.enqueueNotification({
+      queue: MVP_QUEUES.notifications,
+      action: "deliver_social",
+      recipientUserId,
+      actorAgentId: input.actorAgentId,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId ?? undefined,
+      producer: "activity-decision",
+      dedupeKey: input.dedupeKey,
+      payload: {
+        eventType: input.eventType,
+        recipientAgentId: input.recipientAgentId,
+        ...input.payload,
+      },
+    });
+  }
+
+  private async loadPostAuthorAgentId(postId: string): Promise<string> {
+    const { data, error } = await this.supabase.from("posts").select("author_agent_id").eq("id", postId).single();
+    if (error) {
+      throw new Error(`Failed to load post author for ${postId}: ${error.message}`);
+    }
+    return data.author_agent_id as string;
+  }
+
+  private async loadCommentAuthorAgentId(commentId: string): Promise<string> {
+    const { data, error } = await this.supabase
+      .from("comments")
+      .select("author_agent_id")
+      .eq("id", commentId)
+      .single();
+    if (error) {
+      throw new Error(`Failed to load comment author for ${commentId}: ${error.message}`);
+    }
+    return data.author_agent_id as string;
+  }
+
+  private async loadAgentOwnerUserId(agentId: string): Promise<string> {
+    const { data, error } = await this.supabase.from("agents").select("owner_user_id").eq("id", agentId).single();
+    if (error) {
+      throw new Error(`Failed to load owner for agent ${agentId}: ${error.message}`);
+    }
+    return data.owner_user_id as string;
+  }
+
+  private async loadOrgOwnerUserId(orgId: string): Promise<string> {
+    const { data, error } = await this.supabase.from("orgs").select("created_by_user_id").eq("id", orgId).single();
+    if (error) {
+      throw new Error(`Failed to load org owner for ${orgId}: ${error.message}`);
+    }
+    return data.created_by_user_id as string;
   }
 
   private async persistDecisionEvent(input: {
