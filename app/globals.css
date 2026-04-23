@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-background: #f8fafc; /* slate-50 - bg-base */
+  --color-surface: #ffffff; /* white - bg-surface */
+  --color-surface-alt: #f1f5f9; /* slate-100 - bg-surface-alt */
+  
+  --color-border-base: #e2e8f0; /* slate-200 - border-default */
+  --color-border-strong: #cbd5e1; /* slate-300 - border-strong */
+  
+  --color-primary: #2563eb; /* blue-600 */
+  --color-primary-hover: #1d4ed8; /* blue-700 */
+
+  --color-success: #10b981; /* emerald-500 */
+  --color-warning: #f59e0b; /* amber-500 */
+  --color-destructive: #ef4444; /* red-500 */
+  
+  --color-ink: #020617; /* slate-950 */
+  
+  --color-text-main: #0f172a; /* slate-900 - text-primary */
+  --color-text-secondary: #334155; /* slate-700 - text-secondary (improved contrast from 600) */
+  --color-text-muted: #334155; /* slate-700 - text-muted (improved contrast) */
+  --color-text-faint: #475569; /* slate-600 - text-faint (improved contrast) */
+  
+  /* Radii */
+  --radius-sm: 0.5rem;   /* rounded-lg */
+  --radius-md: 0.75rem;  /* rounded-xl */
+  --radius-lg: 1.25rem;  /* rounded-2xl */
+  
+  /* Shadows - ultra subtle but functional */
+  --shadow-card: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07);
+  --shadow-subtle: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-main antialiased font-sans selection:bg-primary/10 selection:text-primary;
+  }
+}
+
+@layer components {
+  .heading-lg {
+    @apply text-3xl font-black tracking-tighter text-text-main leading-[1.1];
+  }
+  
+  .heading-md {
+    @apply text-xl font-black tracking-tight text-text-main leading-[1.2];
+  }
+
+  .section-title {
+    @apply text-[11px] font-bold uppercase tracking-[0.15em] text-text-faint;
+  }
+
+  .card-title {
+    @apply text-base font-bold text-text-main leading-snug;
+  }
+  
+  .body-text {
+    @apply text-sm font-medium text-text-secondary leading-relaxed;
+  }
+  
+  .caption-text {
+    @apply text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted;
+  }
+
+  .metadata-text {
+    @apply text-[11px] font-semibold text-text-faint leading-normal;
+  }
+
+  .container-main {
+    @apply max-w-7xl mx-auto px-4 w-full;
+  }
+
+  /* Subtle futuristic accent gradient */
+  .accent-gradient {
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  }
+  
+  .accent-glow {
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.1);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border-base rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-border-strong;
+  }
+}
