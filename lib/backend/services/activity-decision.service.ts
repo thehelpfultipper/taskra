@@ -6,6 +6,7 @@ import { MVP_QUEUES } from "@/lib/backend/database/schema";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { TaskRunStore, type TaskRunRecord } from "@/lib/backend/queues/task-run-store";
 import { CredibilityService } from "@/lib/backend/services/credibility.service";
+import { SafetyRailsService } from "@/lib/backend/services/safety-rails.service";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 
 export const ACTIVITY_OBJECTIVE_MODES = [
@@ -274,10 +275,12 @@ function isDuplicateError(error: unknown): boolean {
 export class ActivityDecisionService {
   private readonly producer: QueueProducerService;
   private readonly credibility: CredibilityService;
+  private readonly safetyRails: SafetyRailsService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
     this.credibility = new CredibilityService(this.supabase);
+    this.safetyRails = new SafetyRailsService(this.supabase);
   }
 
   async runDecision(input: ActivityDecisionInput): Promise<ActivityDecisionResult> {
@@ -851,6 +854,16 @@ export class ActivityDecisionService {
       return {
         decisionOutcome: selection.decisionOutcome,
         rationale: selection.rationale,
+        contentTaskRunId: null,
+        marketTaskRunId: null,
+      };
+    }
+
+    const safety = await this.safetyRails.evaluateAgentAction(snapshot.agent.id, selection.actionFamily);
+    if (!safety.allowed) {
+      return {
+        decisionOutcome: "no_op",
+        rationale: `Safety rail blocked '${selection.actionFamily}' (${safety.reason ?? "unspecified"}).`,
         contentTaskRunId: null,
         marketTaskRunId: null,
       };

@@ -1,4 +1,10 @@
 import { type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import {
+  checkAgentAvailability,
+  evaluateAgentActionSafety,
+  isPulseEnabled,
+  isQueueProcessingEnabled,
+} from "./safety-rails.ts";
 
 type PulseKind = "agent-activity-5m" | "market-10m" | "hourly-maintenance";
 
@@ -27,9 +33,13 @@ type PulseSummary = {
   enqueued: number;
   dedupeSkipped: number;
   details: Record<string, number>;
+  skippedReason?: string;
   cleanup?: {
     cancelledQueued: number;
     failedRunning: number;
+    deletedSucceededOrCancelled: number;
+    deletedFailed: number;
+    deletedWorkerLogs: number;
   };
 };
 
@@ -112,6 +122,52 @@ async function insertTaskRunsWithDedupe(
     enqueued: filtered.length,
     dedupeSkipped: rows.length - filtered.length,
   };
+}
+
+async function filterRowsByAgentSafety(
+  client: SupabaseClient,
+  rows: TaskRunInsert[],
+): Promise<{ rows: TaskRunInsert[]; skipped: number }> {
+  if (rows.length === 0) {
+    return { rows, skipped: 0 };
+  }
+
+  const cache = new Map<string, { allowed: boolean }>();
+  const filtered: TaskRunInsert[] = [];
+  let skipped = 0;
+
+  for (const row of rows) {
+    if (!row.agent_id) {
+      filtered.push(row);
+      continue;
+    }
+
+    const payloadAction = typeof row.payload?.action === "string" ? row.payload.action : null;
+    const cacheKey = `${row.agent_id}:${payloadAction ?? "none"}`;
+    let decision = cache.get(cacheKey);
+
+    if (!decision) {
+      if (payloadAction === "apply_to_job" || payloadAction === "create_post") {
+        const safety = await evaluateAgentActionSafety(client, {
+          agentId: row.agent_id,
+          actionFamily: payloadAction,
+        });
+        decision = { allowed: safety.allowed };
+      } else {
+        const availability = await checkAgentAvailability(client, row.agent_id);
+        decision = { allowed: availability.allowed };
+      }
+      cache.set(cacheKey, decision);
+    }
+
+    if (decision.allowed) {
+      filtered.push(row);
+    } else {
+      skipped += 1;
+    }
+  }
+
+  return { rows: filtered, skipped };
 }
 
 async function buildAgentActivityPulseRows(
@@ -479,7 +535,13 @@ async function buildHourlyRefreshRows(
   return { rows, candidateCount: rows.length };
 }
 
-async function runHourlyCleanup(client: SupabaseClient): Promise<{ cancelledQueued: number; failedRunning: number }> {
+async function runHourlyCleanup(client: SupabaseClient): Promise<{
+  cancelledQueued: number;
+  failedRunning: number;
+  deletedSucceededOrCancelled: number;
+  deletedFailed: number;
+  deletedWorkerLogs: number;
+}> {
   const nowIso = new Date().toISOString();
   const queuedCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const runningCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
@@ -544,12 +606,88 @@ async function runHourlyCleanup(client: SupabaseClient): Promise<{ cancelledQueu
     failedRunning = staleRunningIds.length;
   }
 
-  return { cancelledQueued, failedRunning };
+  const successfulCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const failedCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const logsCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: oldSucceededRows, error: oldSucceededRowsError } = await client
+    .from("task_runs")
+    .select("id")
+    .in("status", ["succeeded", "cancelled"])
+    .lt("finished_at", successfulCutoff)
+    .order("finished_at", { ascending: true })
+    .limit(200);
+  if (oldSucceededRowsError) {
+    throw new Error(`Failed to load old succeeded/cancelled tasks: ${oldSucceededRowsError.message}`);
+  }
+  const oldSucceededIds = (oldSucceededRows ?? []).map((row) => row.id);
+  let deletedSucceededOrCancelled = 0;
+  if (oldSucceededIds.length > 0) {
+    const { error } = await client.from("task_runs").delete().in("id", oldSucceededIds);
+    if (error) {
+      throw new Error(`Failed to delete old succeeded/cancelled tasks: ${error.message}`);
+    }
+    deletedSucceededOrCancelled = oldSucceededIds.length;
+  }
+
+  const { data: oldFailedRows, error: oldFailedRowsError } = await client
+    .from("task_runs")
+    .select("id")
+    .eq("status", "failed")
+    .lt("finished_at", failedCutoff)
+    .order("finished_at", { ascending: true })
+    .limit(100);
+  if (oldFailedRowsError) {
+    throw new Error(`Failed to load old failed tasks: ${oldFailedRowsError.message}`);
+  }
+  const oldFailedIds = (oldFailedRows ?? []).map((row) => row.id);
+  let deletedFailed = 0;
+  if (oldFailedIds.length > 0) {
+    const { error } = await client.from("task_runs").delete().in("id", oldFailedIds);
+    if (error) {
+      throw new Error(`Failed to delete old failed tasks: ${error.message}`);
+    }
+    deletedFailed = oldFailedIds.length;
+  }
+
+  const { data: oldLogRows, error: oldLogRowsError } = await client
+    .from("worker_run_logs")
+    .select("id")
+    .lt("started_at", logsCutoff)
+    .order("started_at", { ascending: true })
+    .limit(300);
+  if (oldLogRowsError) {
+    throw new Error(`Failed to load old worker logs: ${oldLogRowsError.message}`);
+  }
+  const oldLogIds = (oldLogRows ?? []).map((row) => row.id);
+  let deletedWorkerLogs = 0;
+  if (oldLogIds.length > 0) {
+    const { error } = await client.from("worker_run_logs").delete().in("id", oldLogIds);
+    if (error) {
+      throw new Error(`Failed to delete old worker logs: ${error.message}`);
+    }
+    deletedWorkerLogs = oldLogIds.length;
+  }
+
+  return { cancelledQueued, failedRunning, deletedSucceededOrCancelled, deletedFailed, deletedWorkerLogs };
 }
 
 async function runAgentActivityPulse(client: SupabaseClient, now: Date): Promise<PulseSummary> {
+  const queueEnabled = await isQueueProcessingEnabled(client, QUEUES.agentActivity);
+  if (!queueEnabled) {
+    return {
+      pulse: "agent-activity-5m",
+      attempted: 0,
+      enqueued: 0,
+      dedupeSkipped: 0,
+      details: { eligibleObjectives: 0, skippedBySafety: 0 },
+      skippedReason: "queue_or_global_disable_switch",
+    };
+  }
+
   const { rows, candidateCount } = await buildAgentActivityPulseRows(client, now);
-  const enqueue = await insertTaskRunsWithDedupe(client, rows);
+  const safetyFiltered = await filterRowsByAgentSafety(client, rows);
+  const enqueue = await insertTaskRunsWithDedupe(client, safetyFiltered.rows);
   return {
     pulse: "agent-activity-5m",
     attempted: enqueue.attempted,
@@ -557,16 +695,37 @@ async function runAgentActivityPulse(client: SupabaseClient, now: Date): Promise
     dedupeSkipped: enqueue.dedupeSkipped,
     details: {
       eligibleObjectives: candidateCount,
+      skippedBySafety: safetyFiltered.skipped,
     },
   };
 }
 
 async function runMarketPulse(client: SupabaseClient, now: Date): Promise<PulseSummary> {
-  const candidates = await buildMarketPulseRows(client, now);
+  const queueEnabled = await isQueueProcessingEnabled(client, QUEUES.marketTasks);
+  if (!queueEnabled) {
+    return {
+      pulse: "market-10m",
+      attempted: 0,
+      enqueued: 0,
+      dedupeSkipped: 0,
+      details: {
+        newJobs: 0,
+        newlyOpenToWork: 0,
+        unscreenedApplications: 0,
+        skippedBySafety: 0,
+      },
+      skippedReason: "queue_or_global_disable_switch",
+    };
+  }
 
-  const newJobsResult = await insertTaskRunsWithDedupe(client, candidates.fromNewJobs);
-  const openToWorkResult = await insertTaskRunsWithDedupe(client, candidates.fromNewlyOpenToWorkAgents);
-  const unscreenedResult = await insertTaskRunsWithDedupe(client, candidates.fromUnscreenedApplications);
+  const candidates = await buildMarketPulseRows(client, now);
+  const safetyNewJobs = await filterRowsByAgentSafety(client, candidates.fromNewJobs);
+  const safetyNewlyOpen = await filterRowsByAgentSafety(client, candidates.fromNewlyOpenToWorkAgents);
+  const safetyUnscreened = await filterRowsByAgentSafety(client, candidates.fromUnscreenedApplications);
+
+  const newJobsResult = await insertTaskRunsWithDedupe(client, safetyNewJobs.rows);
+  const openToWorkResult = await insertTaskRunsWithDedupe(client, safetyNewlyOpen.rows);
+  const unscreenedResult = await insertTaskRunsWithDedupe(client, safetyUnscreened.rows);
 
   return {
     pulse: "market-10m",
@@ -578,13 +737,32 @@ async function runMarketPulse(client: SupabaseClient, now: Date): Promise<PulseS
       newJobs: candidates.fromNewJobs.length,
       newlyOpenToWork: candidates.fromNewlyOpenToWorkAgents.length,
       unscreenedApplications: candidates.fromUnscreenedApplications.length,
+      skippedBySafety: safetyNewJobs.skipped + safetyNewlyOpen.skipped + safetyUnscreened.skipped,
     },
   };
 }
 
 async function runHourlyMaintenancePulse(client: SupabaseClient, now: Date): Promise<PulseSummary> {
+  const queueEnabled = await isQueueProcessingEnabled(client, QUEUES.agentActivity);
+  if (!queueEnabled) {
+    const cleanup = await runHourlyCleanup(client);
+    return {
+      pulse: "hourly-maintenance",
+      attempted: 0,
+      enqueued: 0,
+      dedupeSkipped: 0,
+      details: {
+        refreshCandidates: 0,
+        skippedBySafety: 0,
+      },
+      skippedReason: "queue_or_global_disable_switch",
+      cleanup,
+    };
+  }
+
   const { rows, candidateCount } = await buildHourlyRefreshRows(client, now);
-  const enqueue = await insertTaskRunsWithDedupe(client, rows);
+  const safetyFiltered = await filterRowsByAgentSafety(client, rows);
+  const enqueue = await insertTaskRunsWithDedupe(client, safetyFiltered.rows);
   const cleanup = await runHourlyCleanup(client);
 
   return {
@@ -594,6 +772,7 @@ async function runHourlyMaintenancePulse(client: SupabaseClient, now: Date): Pro
     dedupeSkipped: enqueue.dedupeSkipped,
     details: {
       refreshCandidates: candidateCount,
+      skippedBySafety: safetyFiltered.skipped,
     },
     cleanup,
   };
@@ -605,6 +784,18 @@ export type RunPulseInput = {
 };
 
 export async function runPulseOrchestration(input: RunPulseInput): Promise<PulseSummary> {
+  const enabled = await isPulseEnabled(input.client, input.pulse);
+  if (!enabled) {
+    return {
+      pulse: input.pulse,
+      attempted: 0,
+      enqueued: 0,
+      dedupeSkipped: 0,
+      details: {},
+      skippedReason: "cron_or_queue_disable_switch",
+    };
+  }
+
   const now = new Date();
   if (input.pulse === "agent-activity-5m") {
     return runAgentActivityPulse(input.client, now);

@@ -7,6 +7,7 @@ import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { type MarketTaskMessage } from "@/lib/backend/queues/contracts";
 import { TaskRunStore, type TaskRunRecord } from "@/lib/backend/queues/task-run-store";
 import { CredibilityService } from "@/lib/backend/services/credibility.service";
+import { SafetyRailsService } from "@/lib/backend/services/safety-rails.service";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 
 type DecisionOutcome = "executed" | "no_op" | "skipped" | "failed";
@@ -115,10 +116,12 @@ function buildOverlap(profileText: string, jobText: string): string[] {
 export class MarketTaskService {
   private readonly producer: QueueProducerService;
   private readonly credibility: CredibilityService;
+  private readonly safetyRails: SafetyRailsService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
     this.credibility = new CredibilityService(this.supabase);
+    this.safetyRails = new SafetyRailsService(this.supabase);
   }
 
   async processTask(
@@ -145,6 +148,35 @@ export class MarketTaskService {
       this.loadAgentState(message.agentId),
       this.loadPrimaryObjective(message.agentId),
     ]);
+
+    const safety = await this.safetyRails.evaluateAgentAction(agent.id, "apply_to_job");
+    if (!safety.allowed) {
+      const rationale = `Safety rail blocked 'apply_to_job' (${safety.reason ?? "unspecified"}).`;
+      await this.persistDecisionEvent({
+        taskRun,
+        agentId: agent.id,
+        actionFamily: "apply_to_job",
+        decisionOutcome: "no_op",
+        rationale,
+        contextDigest: {
+          phase: "application_decision",
+          reason: "safety_rail_block",
+          safety,
+          jobId: job.id,
+          context: taskContext,
+        },
+      });
+      return {
+        decisionOutcome: "no_op",
+        action: message.action,
+        rationale,
+        details: {
+          jobId: job.id,
+          agentId: agent.id,
+          safety,
+        },
+      };
+    }
 
     if (job.status !== "open" || (job.closes_at && Date.parse(job.closes_at) <= Date.now())) {
       const rationale = "Job is not currently open for new applications.";

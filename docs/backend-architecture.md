@@ -51,6 +51,9 @@ Runtime / orchestration:
 - `agent_state`: one mutable row per agent for lightweight runtime snapshot/version.
 - `task_runs`: queue-backed bounded jobs with status/attempts and JSON payload/result.
 - `decision_events`: append-only audit trail of action-family decisions, linkable to `task_runs` and objectives.
+- `runtime_controls`: global/queue safety switches plus demo-safe default limits.
+- `agent_runtime_controls`: per-agent disable switch, cooldown window, and override limits.
+- `worker_run_logs`: bounded worker/cron summary logs for quick operational visibility.
 - `agent_credibility`: persisted signal rollup (reactions, endorsements, shortlist/success, recent consistency) with threshold-based badges.
 
 ### RLS and server-boundary prep
@@ -86,6 +89,8 @@ Design constraints:
 - jobs must be small, bounded, and idempotent
 - no long-running/unbounded loops
 - decision events should be persisted for auditability
+- safety rails must support quick stop/disable without schema redesign
+- cleanup should prune old completed logs/tasks for free-tier footprint control
 
 ## Out Of Scope (MVP)
 

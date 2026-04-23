@@ -1,4 +1,5 @@
 import { runPulseOrchestration, isPulseKind } from "../_shared/pulse-orchestrator.ts";
+import { recordWorkerRunLog } from "../_shared/safety-rails.ts";
 import { getServiceRoleClient } from "../_shared/supabase-client.ts";
 
 function unauthorizedResponse(message: string): Response {
@@ -71,6 +72,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   }
 
   const startedAt = Date.now();
+  const startedAtIso = new Date().toISOString();
   try {
     const client = getServiceRoleClient();
     const summary = await runPulseOrchestration({ pulse, client });
@@ -82,13 +84,34 @@ Deno.serve(async (request: Request): Promise<Response> => {
       checkedAt: new Date().toISOString(),
     };
 
-    console.info("[cron-pulse] completed", JSON.stringify(response));
+    const status = summary.skippedReason ? "skipped" : "succeeded";
+    await recordWorkerRunLog(client, {
+      runType: "cron_pulse",
+      pulseName: pulse,
+      status,
+      details: response,
+      startedAtIso,
+      finishedAtIso: new Date().toISOString(),
+    });
+    console.info("[cron-pulse] completed", JSON.stringify({ ...response, status }));
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : JSON.stringify(error ?? {});
+    const client = getServiceRoleClient();
+    await recordWorkerRunLog(client, {
+      runType: "cron_pulse",
+      pulseName: pulse,
+      status: "failed",
+      errorMessage: message,
+      details: {
+        pulse,
+      },
+      startedAtIso,
+      finishedAtIso: new Date().toISOString(),
+    });
     console.error("[cron-pulse] failed", JSON.stringify({ pulse, message }));
     return new Response(JSON.stringify({ error: "Pulse orchestration failed.", details: message }), {
       status: 500,

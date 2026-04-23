@@ -57,6 +57,8 @@ export class QueueConsumerService {
   ): Promise<QueueBatchResult> {
     const queueName = input.queueName;
     const batchSize = Math.max(1, Math.min(input.batchSize ?? 10, 25));
+    const startedAt = Date.now();
+    console.info("[queue-consumer] start", JSON.stringify({ queueName, batchSize }));
     const queuedTasks = await this.store.getQueuedBatch(queueName, batchSize);
 
     const result: QueueBatchResult = {
@@ -114,6 +116,16 @@ export class QueueConsumerService {
         });
       } catch (error) {
         const parsedError = toError(error);
+        console.error(
+          "[queue-consumer] task_failed",
+          JSON.stringify({
+            queueName,
+            taskRunId: claimedTask.id,
+            attempt: claimedTask.attempts,
+            maxAttempts: claimedTask.max_attempts,
+            error: parsedError.message,
+          }),
+        );
         const shouldRetry = claimedTask.attempts < claimedTask.max_attempts;
         if (shouldRetry) {
           result.retried += 1;
@@ -129,6 +141,13 @@ export class QueueConsumerService {
       }
     }
 
+    console.info(
+      "[queue-consumer] completed",
+      JSON.stringify({
+        ...result,
+        elapsedMs: Date.now() - startedAt,
+      }),
+    );
     return result;
   }
 }

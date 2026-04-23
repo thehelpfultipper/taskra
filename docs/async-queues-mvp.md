@@ -19,6 +19,8 @@ No additional queues are introduced in this phase.
 - Duplicate handling uses `dedupe_key` and checks prior succeeded runs in the same queue.
 - Retry handling uses `attempts`/`max_attempts` with exponential backoff (15s base).
 - Terminal failures move to `status='failed'`; no advanced dead-letter infrastructure is added.
+- Runtime safety controls can pause globally, per queue, or per agent without code changes.
+- Worker batch outcomes are summarized in `public.worker_run_logs` for operational visibility.
 
 ## Queue Contracts and Responsibilities
 

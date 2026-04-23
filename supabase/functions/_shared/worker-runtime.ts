@@ -3,6 +3,7 @@ import {
   type MvpQueueName,
   type QueueMessageByName,
 } from "./queue-contracts.ts";
+import { isQueueProcessingEnabled, recordWorkerRunLog } from "./safety-rails.ts";
 import { getServiceRoleClient } from "./supabase-client.ts";
 import { TaskRunStore } from "./task-run-store.ts";
 
@@ -65,10 +66,43 @@ function toError(error: unknown): Error {
 export async function runQueueWorker<TQueue extends MvpQueueName>(
   input: RunWorkerInput<TQueue>,
 ): Promise<Response> {
+  const startedAtIso = new Date().toISOString();
   const defaultBatchSize = Math.max(1, Math.min(input.defaultBatchSize ?? 10, 25));
   const maxBatchSize = Math.max(defaultBatchSize, Math.min(input.maxBatchSize ?? 25, 25));
   const requestedBatchSize = getRequestedBatchSize(input.request, defaultBatchSize, maxBatchSize);
-  const store = new TaskRunStore(getServiceRoleClient());
+  const client = getServiceRoleClient();
+  const store = new TaskRunStore(client);
+  const queueEnabled = await isQueueProcessingEnabled(client, input.queueName);
+
+  if (!queueEnabled) {
+    const skippedResult: WorkerResult = {
+      queueName: input.queueName,
+      requestedBatchSize,
+      claimed: 0,
+      succeeded: 0,
+      retried: 0,
+      failed: 0,
+      skippedDuplicate: 0,
+    };
+    await recordWorkerRunLog(client, {
+      runType: "worker_batch",
+      queueName: input.queueName,
+      status: "skipped",
+      requestedBatchSize,
+      details: {
+        reason: "queue_or_global_disable_switch",
+      },
+      startedAtIso,
+      finishedAtIso: new Date().toISOString(),
+    });
+    console.info("[worker-runtime] skipped", JSON.stringify({ queueName: input.queueName, reason: "queue_disabled" }));
+    return new Response(JSON.stringify(skippedResult), {
+      headers: { "content-type": "application/json; charset=utf-8" },
+      status: 200,
+    });
+  }
+
+  console.info("[worker-runtime] start", JSON.stringify({ queueName: input.queueName, requestedBatchSize }));
   const queuedTasks = await store.getQueuedBatch(input.queueName, requestedBatchSize);
 
   const result: WorkerResult = {
@@ -121,6 +155,16 @@ export async function runQueueWorker<TQueue extends MvpQueueName>(
       });
     } catch (error) {
       const parsedError = toError(error);
+      console.error(
+        "[worker-runtime] task_failed",
+        JSON.stringify({
+          queueName: input.queueName,
+          taskRunId: claimed.id,
+          attempt: claimed.attempts,
+          maxAttempts: claimed.max_attempts,
+          error: parsedError.message,
+        }),
+      );
       const shouldRetry = claimed.attempts < claimed.max_attempts;
       if (shouldRetry) {
         result.retried += 1;
@@ -132,6 +176,23 @@ export async function runQueueWorker<TQueue extends MvpQueueName>(
     }
   }
 
+  await recordWorkerRunLog(client, {
+    runType: "worker_batch",
+    queueName: input.queueName,
+    status: result.failed > 0 ? "failed" : "succeeded",
+    requestedBatchSize,
+    claimed: result.claimed,
+    succeeded: result.succeeded,
+    retried: result.retried,
+    failed: result.failed,
+    skippedDuplicate: result.skippedDuplicate,
+    details: {
+      queuedBatchLength: queuedTasks.length,
+    },
+    startedAtIso,
+    finishedAtIso: new Date().toISOString(),
+  });
+  console.info("[worker-runtime] completed", JSON.stringify(result));
   return new Response(JSON.stringify(result), {
     headers: { "content-type": "application/json; charset=utf-8" },
     status: 200,

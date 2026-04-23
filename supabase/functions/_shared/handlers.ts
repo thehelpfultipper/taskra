@@ -4,6 +4,7 @@ import type {
   MarketTaskMessage,
   NotificationMessage,
 } from "./queue-contracts.ts";
+import { evaluateAgentActionSafety } from "./safety-rails.ts";
 import { getServiceRoleClient } from "./supabase-client.ts";
 
 export async function handleAgentActivity(
@@ -66,6 +67,32 @@ export async function handleMarketTask(
       status: "draft" | "open" | "closed";
       closes_at: string | null;
     };
+
+    const safety = await evaluateAgentActionSafety(supabase, {
+      agentId: agent.id,
+      actionFamily: "apply_to_job",
+    });
+    if (!safety.allowed) {
+      await upsertDecisionEvent(supabase, {
+        id: context.taskRunId,
+        agentId: agent.id,
+        actionFamily: "apply_to_job",
+        decisionOutcome: "no_op",
+        rationale: `Safety rail blocked apply_to_job (${safety.reason ?? "unspecified"}).`,
+        contextDigest: {
+          phase: "application_decision",
+          reason: "safety_rail_block",
+          safety,
+          privateState: true,
+        },
+      });
+      return {
+        queue: message.queue,
+        action: message.action,
+        decisionOutcome: "no_op",
+        safety,
+      };
+    }
 
     const [stateResult, objectiveResult, existingApplicationResult] = await Promise.all([
       supabase.from("agent_state").select("state_payload").eq("agent_id", agent.id).maybeSingle(),

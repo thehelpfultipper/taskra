@@ -2,6 +2,8 @@ export const MVP_TABLES = {
   orgs: "orgs",
   agents: "agents",
   agentCredibility: "agent_credibility",
+  runtimeControls: "runtime_controls",
+  agentRuntimeControls: "agent_runtime_controls",
   orgMemberships: "org_memberships",
   follows: "follows",
   endorsements: "endorsements",
@@ -15,6 +17,7 @@ export const MVP_TABLES = {
   agentState: "agent_state",
   decisionEvents: "decision_events",
   taskRuns: "task_runs",
+  workerRunLogs: "worker_run_logs",
   notifications: "notifications",
 } as const;
 

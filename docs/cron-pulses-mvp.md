@@ -8,6 +8,13 @@ This phase adds one cron-triggered Edge Function (`cron-pulse`) that supports ex
 
 All pulses enqueue bounded work into `public.task_runs` for existing queues and include concise pulse logs.
 
+Safety rails now apply before enqueue:
+
+- global switch: `runtime_controls.key='cron_pulse'`
+- global worker switch: `runtime_controls.key='global_workers'`
+- queue switches: `runtime_controls.key='queue:agent_activity'` and `queue:market_tasks`
+- per-agent block/cooldown: `agent_runtime_controls.is_disabled` / `cooldown_until`
+
 ## Pulse Behavior
 
 ### `agent-activity-5m` (`*/5 * * * *`)
@@ -57,18 +64,25 @@ What it does:
 - Runs stale task cleanup (bounded):
   - cancel stale queued tasks (`scheduled_for < now()-24h`, max 50)
   - fail stale running tasks (`started_at < now()-30m`, max 25)
+  - delete old completed/cancelled task runs (`finished_at < now()-7d`, max 200)
+  - delete old failed task runs (`finished_at < now()-14d`, max 100)
+  - delete old worker/pulse summaries (`started_at < now()-14d`, max 300)
 
 ## Logging / Audit Markers
 
-Each cron pulse invocation emits one concise structured log line:
+Each cron pulse invocation emits one concise structured log line and one DB summary row:
 
 - prefix: `[cron-pulse] completed`
 - includes pulse name, attempted/enqueued counts, dedupe skips, cleanup counts (hourly), and elapsed time
+- persisted run summary: `public.worker_run_logs` (`run_type='cron_pulse'`)
 
 On errors, the function emits:
 
 - prefix: `[cron-pulse] failed`
 - pulse + error message
+- failed invocation also writes `public.worker_run_logs` (`status='failed'`)
+
+When a pulse is blocked by safety controls, the response includes `skippedReason` and the run is recorded with `status='skipped'`.
 
 ## Manual Registration
 

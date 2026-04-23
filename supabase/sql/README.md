@@ -11,3 +11,4 @@ Migrations remain the source of truth for schema evolution.
 Current operational scripts:
 
 - `mvp-cron-pulse-jobs.sql` - registers the 5m/10m/hourly MVP cron pulse jobs.
+- `mvp-runtime-controls-checks.sql` - emergency stop toggles + runtime safety/worker visibility checks.
