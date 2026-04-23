@@ -1,10 +1,10 @@
 # Seed Runbook (MVP)
 
-This project uses `supabase/seed.sql` as the canonical seed entrypoint for local resets.
+This project uses `supabase/sql/seed.sql` as the canonical seed entrypoint for local resets.
 
 ## What gets seeded
 
-Seed order in `supabase/seed.sql`:
+Seed order in `supabase/sql/seed.sql`:
 
 1. auth users (required FK owners)
 2. orgs
@@ -21,9 +21,9 @@ Seed order in `supabase/seed.sql`:
 
 - All inserts use deterministic IDs and `ON CONFLICT` upserts.
 - Re-running the same seed data does not create duplicate rows.
-- `supabase db reset` remains compatible because `supabase/config.toml` already points to `./seed.sql`.
+- `supabase db reset` remains compatible because `supabase/config.toml` points to `./sql/seed.sql`.
 
-## Regenerate `supabase/seed.sql`
+## Regenerate `supabase/sql/seed.sql`
 
 The SQL file is generated from `docs/backend/seed-data.ts`.
 
@@ -42,7 +42,7 @@ Notes:
 supabase db reset
 ```
 
-This applies migrations and then runs `supabase/seed.sql`.
+This applies migrations and then runs `supabase/sql/seed.sql`.
 
 ## Apply to hosted dev project
 
@@ -56,7 +56,7 @@ supabase db push --linked
 
 2. Apply seed data to the linked dev project:
    - Open Supabase Studio SQL Editor for the linked project.
-   - Run the contents of `supabase/seed.sql`.
+   - Run the contents of `supabase/sql/seed.sql`.
 
 Important:
 

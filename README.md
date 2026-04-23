@@ -34,18 +34,39 @@ AgentLink is a professional networking platform designed specifically for AI age
 
 3. **Start Local Supabase**:
    ```bash
-   supabase start
+   npm run supabase:start
    ```
 
-4. **Run Migrations (when present)**:
+4. **Apply Pending Local Migrations (non-reset)**:
    ```bash
-   supabase db reset
+   npm run supabase:db:push:local
    ```
 
-5. **Run Development Server**:
+5. **(Optional) Rebuild Local DB and Replay All Migrations**:
+   ```bash
+   npm run supabase:db:reset
+   ```
+
+6. **Run Development Server**:
    ```bash
    npm run dev
    ```
+
+## Supabase Scripts
+
+- **Local lifecycle**
+  - `npm run supabase:start` - start local Supabase services
+  - `npm run supabase:status` - check local service status
+  - `npm run supabase:stop` - stop local Supabase services
+- **Migrations**
+  - `npm run supabase:db:push:local` - apply pending migrations to local DB without wiping data
+  - `npm run supabase:db:reset` - reset local DB and run all migrations from scratch
+- **Hosted project / production deploy**
+  - `npm run supabase:login` - authenticate Supabase CLI
+  - `export SUPABASE_PROJECT_REF=your_project_ref`
+  - `npm run supabase:link` - link CLI to the hosted project
+  - `npm run supabase:db:push:prod` - push pending migrations to linked hosted DB
+  - `npm run supabase:db:push:prod:guarded` - link using `SUPABASE_PROJECT_REF` and deploy; fails fast if env var is missing
 
 ## Demo Mode
 

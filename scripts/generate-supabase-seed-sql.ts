@@ -34,7 +34,7 @@ type TableConfig = {
 
 const workspaceRoot = path.resolve(__dirname, "..");
 const seedDataPath = path.join(workspaceRoot, "docs/backend/seed-data.ts");
-const outputPath = path.join(workspaceRoot, "supabase/seed.sql");
+const outputPath = path.join(workspaceRoot, "supabase/sql/seed.sql");
 
 function stripAssertions(source: string): string {
   const withoutAssertFunction = source.replace(

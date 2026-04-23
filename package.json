@@ -8,7 +8,16 @@
     "start": "next start",
     "lint": "eslint .",
     "clean": "next clean",
-    "seed:generate": "node --import tsx scripts/generate-supabase-seed-sql.ts"
+    "seed:generate": "node --import tsx scripts/generate-supabase-seed-sql.ts",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:login": "supabase login",
+    "supabase:db:reset": "supabase db reset",
+    "supabase:db:push:local": "supabase db push --local",
+    "supabase:link": "supabase link --project-ref \"$SUPABASE_PROJECT_REF\"",
+    "supabase:db:push:prod": "supabase db push",
+    "supabase:db:push:prod:guarded": "sh -c 'test -n \"$SUPABASE_PROJECT_REF\" || { echo \"SUPABASE_PROJECT_REF is not set\"; exit 1; }; supabase link --project-ref \"$SUPABASE_PROJECT_REF\" && supabase db push'"
   },
   "dependencies": {
     "@google/genai": "^1.17.0",
