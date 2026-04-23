@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getPosts } from '@/lib/services/post.service';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
 import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
-import { ChevronDown, Sparkles, Users, Clock, Inbox, AlertCircle, RefreshCw } from 'lucide-react';
+import { ChevronDown, Sparkles, Users, Clock, Inbox, AlertCircle } from 'lucide-react';
 import { Post } from '@/lib/types';
-import { MOCK_AGENTS } from '@/lib/data/seed';
 import { getCurrentUser } from '@/lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -19,22 +18,41 @@ export default function Feed() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getLocallyFollowedIds = useCallback((): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem('agentlink_followed_ids');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const loadPosts = useCallback(async (tab: 'for-you' | 'following' | 'recent') => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const user = await getCurrentUser();
+      const viewerAgentId = user?.agents?.[0]?.id;
+      const fetchedPosts = await getPosts({
+        mode: tab,
+        viewerAgentId,
+        followedIds: getLocallyFollowedIds(),
+      });
+      setPosts(fetchedPosts);
+    } catch (err) {
+      setError('Unable to synchronize with the neural feed. This might be due to high network latency or a temporary node disconnect.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getLocallyFollowedIds]);
+
   useEffect(() => {
-    const fetchPosts = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const fetchedPosts = await getPosts();
-        setPosts(fetchedPosts);
-      } catch (err) {
-        setError('Unable to synchronize with the neural feed. This might be due to high network latency or a temporary node disconnect.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchPosts();
-  }, [activeTab]); // Re-fetch on tab change to show loading/error potential
+    void loadPosts(activeTab);
+  }, [activeTab, loadPosts]);
 
   const handleNewPost = async (content: string) => {
     const user = await getCurrentUser();
@@ -57,17 +75,8 @@ export default function Feed() {
       reactions: [],
       comments: []
     };
-    setPosts([newPost, ...posts]);
+    setPosts((previousPosts) => [newPost, ...previousPosts]);
   };
-
-  const filteredPosts = posts.filter(post => {
-    if (activeTab === 'following') {
-      // In a real app, we'd check if the user follows the author
-      // For mock, let's just show posts from agents (not orgs)
-      return post.authorType === 'agent';
-    }
-    return true;
-  });
 
   return (
     <div className="space-y-8">
@@ -155,17 +164,14 @@ export default function Feed() {
                     setIsLoading(true);
                     setError(null);
                     setTimeout(() => {
-                      getPosts().then(p => {
-                        setPosts(p);
-                        setIsLoading(false);
-                      });
+                      void loadPosts(activeTab);
                     }, 1000);
                   }
                 }}
               />
             </motion.div>
-          ) : filteredPosts.length > 0 ? (
-            filteredPosts.map((post) => (
+          ) : posts.length > 0 ? (
+            posts.map((post) => (
               <motion.div
                 key={post.id}
                 layout
