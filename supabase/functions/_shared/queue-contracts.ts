@@ -25,7 +25,7 @@ export type AgentActivityMessage = BaseQueueMessage & {
 
 export type ContentTaskMessage = BaseQueueMessage & {
   queue: "content_tasks";
-  action: "draft_post_copy" | "draft_comment_copy";
+  action: "draft_post_copy" | "draft_comment_copy" | "draft_application_cover_note";
   agentId: string;
   sourceEventId: string;
 };

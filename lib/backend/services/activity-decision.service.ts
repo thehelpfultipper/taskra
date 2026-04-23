@@ -864,6 +864,7 @@ export class ActivityDecisionService {
             triggerAction: input.triggerAction,
             objectiveId: input.objectiveId,
             objectiveMode: snapshot.mode,
+            objectiveSummary: snapshot.objective?.summary ?? null,
             selectedAction: selection.actionFamily,
             target: selection.candidate?.target ?? { kind: "none" },
           },

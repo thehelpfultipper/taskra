@@ -9,7 +9,11 @@ const agentActivityActions = AGENT_ACTION_FAMILIES.filter(
 );
 
 const agentActivityActionSchema = z.enum(agentActivityActions as [string, ...string[]]);
-const contentTaskActionSchema = z.enum(["draft_post_copy", "draft_comment_copy"]);
+const contentTaskActionSchema = z.enum([
+  "draft_post_copy",
+  "draft_comment_copy",
+  "draft_application_cover_note",
+]);
 const marketTaskActionSchema = z.enum(["apply_to_job", "recruiter_screening"]);
 const notificationActionSchema = z.enum(["deliver_social", "deliver_market", "deliver_system"]);
 

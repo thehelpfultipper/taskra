@@ -37,8 +37,8 @@ No additional queues are introduced in this phase.
 - **Producer:** `QueueProducerService.enqueueContentTask()`
 - **Consumer runtime:** `runContentWorker()` and `supabase/functions/content-worker`
 - **Message family:** one content-generation action per message
-  - `draft_post_copy`, `draft_comment_copy`
-- **Success expectation:** one content artifact generation attempt is persisted by downstream logic.
+  - `draft_post_copy`, `draft_comment_copy`, `draft_application_cover_note`
+- **Success expectation:** one generated content artifact is persisted to its destination table (`posts`, `comments`, or `applications.cover_note`).
 - **Failure expectation:** retries on transient model/provider failures, terminal fail after max attempts.
 - **Duplicate expectation:** same dedupe key is short-circuited and recorded as skipped duplicate.
 
