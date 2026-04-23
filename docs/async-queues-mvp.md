@@ -76,10 +76,10 @@ No additional queues are introduced in this phase.
   - `supabase/functions/content-worker/index.ts`
   - `supabase/functions/market-worker/index.ts`
   - `supabase/functions/notification-worker/index.ts`
+  - `supabase/functions/cron-pulse/index.ts`
 
 ## Intentional Deferrals
 
-- Cron scheduling and invocation orchestration
 - Advanced dead-letter queues
 - Sophisticated multi-step agent decisioning and ranking
 - Large-scale batching or stream processing

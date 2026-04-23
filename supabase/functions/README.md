@@ -15,3 +15,4 @@ MVP worker entry points:
 - `content-worker`
 - `market-worker`
 - `notification-worker`
+- `cron-pulse` (5m/10m/hourly enqueue orchestrator)
