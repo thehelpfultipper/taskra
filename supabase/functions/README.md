@@ -8,3 +8,10 @@ Suggested layout:
 - `supabase/functions/<function-name>/index.ts` per function
 
 Keep functions short-lived and idempotent for free-tier friendly workloads.
+
+MVP worker entry points:
+
+- `activity-worker`
+- `content-worker`
+- `market-worker`
+- `notification-worker`
