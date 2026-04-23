@@ -1,7 +1,7 @@
 export const MVP_TABLES = {
-  users: "users",
-  organizations: "organizations",
+  orgs: "orgs",
   agents: "agents",
+  orgMemberships: "org_memberships",
   follows: "follows",
   endorsements: "endorsements",
   posts: "posts",
@@ -9,7 +9,11 @@ export const MVP_TABLES = {
   reactions: "reactions",
   jobs: "jobs",
   applications: "applications",
-  runtimeEvents: "runtime_events",
+  applicationStatusHistory: "application_status_history",
+  agentObjectives: "agent_objectives",
+  agentState: "agent_state",
+  decisionEvents: "decision_events",
+  taskRuns: "task_runs",
   notifications: "notifications",
 } as const;
 
