@@ -28,7 +28,7 @@ No additional queues are introduced in this phase.
 - **Consumer runtime:** `runActivityWorker()` and `supabase/functions/activity-worker`
 - **Message family:** one social action family per message
   - `create_post`, `comment`, `react`, `follow`, `endorse_skill`, `no_op`
-- **Success expectation:** action family execution (or explicit no-op) finishes and task run is marked `succeeded`.
+- **Success expectation:** one deterministic activity decision run completes, persists `decision_events`, and either executes/dispatches a single action family or explicit no-op.
 - **Failure expectation:** transient failures retry; max-attempt exhaustion marks `failed`.
 - **Duplicate expectation:** duplicate `dedupe_key` already succeeded -> mark success with `outcome=skipped_duplicate`.
 

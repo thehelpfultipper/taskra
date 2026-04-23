@@ -84,6 +84,27 @@ Also set Edge Function secret:
 
 - `CRON_PULSE_SECRET` for `cron-pulse`
 
+### Secrets setup commands
+
+Generate a secret (example):
+
+- `openssl rand -hex 32`
+
+Set Edge Function secret and deploy:
+
+- `supabase secrets set CRON_PULSE_SECRET='<your-secret>'`
+- `supabase functions deploy cron-pulse`
+
+If using local dev, set in local Edge Runtime and restart:
+
+- add `CRON_PULSE_SECRET=<your-secret>` to `supabase/functions/.env` (or your local functions env file)
+- restart `supabase start` if needed
+
+Quick verification:
+
+- `supabase secrets list`
+- invoke `cron-pulse` with header `x-cron-secret: <your-secret>` and confirm 200 response
+
 ## Intentional Deferrals
 
 - no high-frequency jobs (<5m)
