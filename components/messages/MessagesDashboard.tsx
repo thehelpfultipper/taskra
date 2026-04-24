@@ -175,7 +175,7 @@ export default function MessagesDashboard() {
   };
 
   return (
-    <div className="h-[calc(100vh-12rem)] flex overflow-hidden bg-white/80 backdrop-blur-sm border border-border-base/60 rounded-3xl md:rounded-[2.5rem] shadow-subtle">
+    <div className="h-[calc(100dvh-8.5rem)] sm:h-[calc(100dvh-10rem)] md:h-[calc(100dvh-12rem)] min-h-[24rem] sm:min-h-[30rem] md:min-h-[36rem] max-h-[56rem] flex overflow-hidden bg-white/80 backdrop-blur-sm border border-border-base/60 rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] shadow-subtle">
       {/* Sidebar: Thread List */}
       <div className={cn(
         "w-full md:w-80 lg:w-96 border-r border-border-base/60 flex flex-col bg-surface-alt/10",
@@ -263,7 +263,7 @@ export default function MessagesDashboard() {
                       <button
                         onClick={() => handleSelectThread(thread.id)}
                         className={cn(
-                          "w-full p-5 flex gap-4 transition-all hover:bg-white/50 text-left relative",
+                          "w-full p-3 sm:p-4 md:p-5 flex gap-3 md:gap-4 transition-all hover:bg-white/50 text-left relative",
                           isActive ? "bg-white shadow-sm" : "bg-transparent"
                         )}
                       >
@@ -387,7 +387,7 @@ export default function MessagesDashboard() {
 
       {/* Main Content: Selected Thread */}
       <div className={cn(
-        "flex-1 flex flex-col bg-white/40",
+        "flex-1 flex flex-col min-h-0 bg-white/40",
         !selectedThreadId ? "hidden md:flex" : "flex"
       )}>
         {selectedThread && otherParticipant ? (
@@ -397,10 +397,10 @@ export default function MessagesDashboard() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col min-h-0"
             >
               {/* Thread Header */}
-              <div className="h-20 px-4 md:px-8 border-b border-border-base/60 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
+              <div className="h-16 sm:h-20 px-3 sm:px-4 md:px-8 border-b border-border-base/60 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex items-center gap-2 md:gap-4 min-w-0">
                   <Button 
                     variant="ghost" 
@@ -436,14 +436,14 @@ export default function MessagesDashboard() {
               </div>
 
               {/* Message History */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 bg-surface-alt/5">
+              <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 bg-surface-alt/5">
                 {threadMessages.map((msg, idx) => {
                   const isMe = msg.senderId === currentUser.id;
                   const showAvatar = idx === 0 || threadMessages[idx - 1].senderId !== msg.senderId;
                   
                   return (
                     <div key={msg.id} className={cn(
-                      "flex gap-4 max-w-[80%]",
+                      "flex gap-2 sm:gap-3 md:gap-4 max-w-[88%] sm:max-w-[82%] md:max-w-[80%]",
                       isMe ? "ml-auto flex-row-reverse" : "mr-auto"
                     )}>
                       {!isMe && (
@@ -455,7 +455,7 @@ export default function MessagesDashboard() {
                       )}
                       <div className="space-y-2">
                         <div className={cn(
-                          "p-4 rounded-2xl text-sm leading-relaxed shadow-subtle",
+                          "p-3 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-subtle",
                           isMe 
                             ? "bg-text-main text-white rounded-tr-none" 
                             : "bg-white text-text-main border border-border-base/60 rounded-tl-none"
@@ -476,23 +476,23 @@ export default function MessagesDashboard() {
               </div>
 
               {/* Message Composer */}
-              <div className="p-6 border-t border-border-base/60 bg-white/80 backdrop-blur-md">
-                <form onSubmit={handleSendMessage} className="flex gap-4 items-center">
+              <div className="p-3 sm:p-4 md:p-6 border-t border-border-base/60 bg-white/90 backdrop-blur-md sticky bottom-0 z-10">
+                <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3 md:gap-4 items-center">
                   <div className="flex-1 relative group">
                     <Input 
                       placeholder="Transmit signal..." 
-                      className="h-14 bg-surface-alt/50 border-border-base/40 rounded-2xl text-[13px] font-bold pr-14 focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/5 transition-all"
+                      className="h-11 sm:h-12 md:h-14 bg-surface-alt/50 border-border-base/40 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-bold pr-12 sm:pr-14 focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/5 transition-all"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <Button type="submit" size="icon" className="h-10 w-10 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all" disabled={!newMessage.trim()}>
+                      <Button type="submit" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-all" disabled={!newMessage.trim()}>
                         <Send size={16} />
                       </Button>
                     </div>
                   </div>
                 </form>
-                <p className="text-[9px] font-black text-text-muted/30 uppercase tracking-[0.3em] text-center mt-4">
+                <p className="hidden sm:block text-[9px] font-black text-text-muted/30 uppercase tracking-[0.3em] text-center mt-3 md:mt-4">
                   Press Enter to transmit • Shift + Enter for new line
                 </p>
               </div>
@@ -505,7 +505,7 @@ export default function MessagesDashboard() {
               title="Your Conversations"
               description="Select a thread from the sidebar to start messaging with recruiters, peer agents, or organizations."
             />
-            <div className="grid grid-cols-2 gap-3 w-full max-w-md mt-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md mt-8">
               <Card className="p-4 flex flex-col items-center gap-2 text-center bg-slate-50/50 border-dashed">
                 <Building2 size={20} className="text-primary" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Provisioning Requests</span>
