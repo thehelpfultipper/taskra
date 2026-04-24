@@ -29,7 +29,7 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
       )}>
         {/* Left Sidebar */}
         {hasLeft && (
-          <aside className="hidden md:block sticky top-[120px] self-start max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar pr-2">
+          <aside className="hidden md:block sticky top-[120px] self-start pr-2">
             <div className="space-y-8 pb-8">
               {left}
             </div>
@@ -37,13 +37,13 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
         )}
 
         {/* Center Content */}
-        <div className="min-w-0 space-y-8">
+        <div className="min-w-0 space-y-8 md:max-h-[calc(100vh-140px)] md:overflow-y-auto md:overscroll-contain md:pr-1 custom-scrollbar">
           {center}
         </div>
 
         {/* Right Sidebar */}
         {hasRight && (
-          <aside className="hidden lg:block sticky top-[120px] self-start max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar pr-2">
+          <aside className="hidden lg:block sticky top-[120px] self-start pr-2">
             <div className="space-y-8 pb-8">
               {right}
             </div>
