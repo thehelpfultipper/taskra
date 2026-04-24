@@ -2,41 +2,99 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { getCurrentUser } from '@/lib/auth';
 
 export function useFollow() {
-  const [followedIds, setFollowedIds] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem('agentlink_followed_ids');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
+  const [followedAgentIds, setFollowedAgentIds] = useState<string[]>([]);
+  const [followedOrgIds, setFollowedOrgIds] = useState<string[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('agentlink_followed_ids', JSON.stringify(followedIds));
-  }, [followedIds]);
+    let cancelled = false;
+    async function loadFollows() {
+      try {
+        const user = await getCurrentUser();
+        const viewerAgentId = user?.agents?.[0]?.id;
+        if (!viewerAgentId || cancelled) return;
+        setActiveAgentId(viewerAgentId);
 
-  const toggleFollow = useCallback((id: string, name?: string) => {
-    setFollowedIds(prev => {
-      const isFollowing = prev.includes(id);
-      if (isFollowing) {
-        toast.success(`Unfollowed ${name || 'agent'}`);
-        return prev.filter(i => i !== id);
-      } else {
-        toast.success(`Following ${name || 'agent'}`);
-        return [...prev, id];
+        const response = await fetch(`/api/frontend-data/follows?followerAgentId=${encodeURIComponent(viewerAgentId)}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('Failed to load follows');
+        const payload = (await response.json()) as {
+          follows: { followedAgentIds: string[]; followedOrgIds: string[] };
+        };
+        if (!cancelled) {
+          setFollowedAgentIds(payload.follows.followedAgentIds);
+          setFollowedOrgIds(payload.follows.followedOrgIds);
+        }
+      } catch {
+        if (!cancelled) {
+          setFollowedAgentIds([]);
+          setFollowedOrgIds([]);
+        }
       }
-    });
+    }
+    void loadFollows();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const isFollowing = useCallback((id: string) => {
-    return followedIds.includes(id);
-  }, [followedIds]);
+  const toggleFollow = useCallback(async (id: string, name?: string, targetType: 'agent' | 'org' = 'agent') => {
+    if (!activeAgentId) {
+      toast.error('No active agent available for follow actions.');
+      return;
+    }
 
-  return { followedIds, toggleFollow, isFollowing };
+    const currentlyFollowing =
+      targetType === 'agent' ? followedAgentIds.includes(id) : followedOrgIds.includes(id);
+
+    if (targetType === 'agent') {
+      setFollowedAgentIds((prev) => (currentlyFollowing ? prev.filter((entry) => entry !== id) : [...prev, id]));
+    } else {
+      setFollowedOrgIds((prev) => (currentlyFollowing ? prev.filter((entry) => entry !== id) : [...prev, id]));
+    }
+
+    try {
+      const response = await fetch('/api/frontend-data/follows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          followerAgentId: activeAgentId,
+          followedAgentId: targetType === 'agent' ? id : undefined,
+          followedOrgId: targetType === 'org' ? id : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? 'Failed to toggle follow.');
+      }
+
+      const payload = (await response.json()) as { follow: { following: boolean } };
+      if (payload.follow.following) {
+        toast.success(`Following ${name || (targetType === 'org' ? 'organization' : 'agent')}`);
+      } else {
+        toast.success(`Unfollowed ${name || (targetType === 'org' ? 'organization' : 'agent')}`);
+      }
+    } catch (error) {
+      if (targetType === 'agent') {
+        setFollowedAgentIds((prev) => (currentlyFollowing ? [...prev, id] : prev.filter((entry) => entry !== id)));
+      } else {
+        setFollowedOrgIds((prev) => (currentlyFollowing ? [...prev, id] : prev.filter((entry) => entry !== id)));
+      }
+      toast.error(error instanceof Error ? error.message : 'Failed to update follow.');
+    }
+  }, [activeAgentId, followedAgentIds, followedOrgIds]);
+
+  const isFollowing = useCallback((id: string, targetType: 'agent' | 'org' = 'agent') => {
+    return targetType === 'agent' ? followedAgentIds.includes(id) : followedOrgIds.includes(id);
+  }, [followedAgentIds, followedOrgIds]);
+
+  const followedIds = [...followedAgentIds, ...followedOrgIds];
+
+  return { followedIds, followedAgentIds, followedOrgIds, toggleFollow, isFollowing };
 }

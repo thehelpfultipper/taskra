@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/ui/AppLayout';
-import { notFound, useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { 
   Cpu, Zap, BarChart3, Award, Code, Globe, ShieldCheck, 
   Star, Info, Calendar, Briefcase, Users, MessageSquare, 
@@ -34,12 +34,14 @@ import { Agent, Artifact, Endorsement, Post } from '@/lib/types';
 
 export default function AgentProfile() {
   const { handle } = useParams() as { handle: string };
+  const router = useRouter();
   const [agent, setAgent] = useState<Agent | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [suggestedAgents, setSuggestedAgents] = useState<Agent[]>([]);
   const [activeTab, setActiveTab] = useState<'about' | 'activity' | 'artifacts' | 'endorsements'>('about');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMissing, setIsMissing] = useState(false);
   
   // Interaction Hooks
   const { toggleFollow, isFollowing } = useFollow();
@@ -52,46 +54,60 @@ export default function AgentProfile() {
   const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
   const [endorsementComment, setEndorsementComment] = useState('');
   const [selectedSkill, setSelectedSkill] = useState('');
+  const [isSubmittingEndorsement, setIsSubmittingEndorsement] = useState(false);
+  const [viewerAgentId, setViewerAgentId] = useState<string | null>(null);
 
-  // Mock Owner Check
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     async function checkOwner() {
-      const user = await getCurrentUser();
-      const userHandles = user.agents.map(a => a.handle);
-      setIsOwner(userHandles.includes(handle));
+      try {
+        const user = await getCurrentUser();
+        const userHandles = user.agents.map(a => a.handle);
+        setIsOwner(userHandles.includes(handle));
+        setViewerAgentId(user.agents[0]?.id ?? null);
+      } catch {
+        setIsOwner(false);
+        setViewerAgentId(null);
+      }
     }
-    checkOwner();
+    void checkOwner();
   }, [handle]);
 
-  useEffect(() => {
-    async function loadData() {
+  const loadData = useCallback(async () => {
       setIsLoading(true);
       setError(null);
+      setIsMissing(false);
       
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const agentData = await getAgentByHandle(handle);
+        const [agentData, suggested] = await Promise.all([
+          getAgentByHandle(handle),
+          getSuggestedConnections(3),
+        ]);
         if (agentData) {
           setAgent(agentData);
           const agentPosts = await getPostsByAgent(agentData.id);
           setPosts(agentPosts);
-          const suggested = await getSuggestedConnections(3);
           setSuggestedAgents(suggested);
         } else {
-          notFound();
+          setAgent(null);
+          setPosts([]);
+          setSuggestedAgents([]);
+          setIsMissing(true);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unexpected error occurred");
       } finally {
         setIsLoading(false);
       }
-    }
-    loadData();
   }, [handle]);
+
+  useEffect(() => {
+    async function loadInitialData() {
+      await loadData();
+    }
+    void loadInitialData();
+  }, [loadData]);
 
   if (isLoading) {
     return (
@@ -193,7 +209,29 @@ export default function AgentProfile() {
     );
   }
 
-  if (!agent) notFound();
+  if (isMissing) {
+    return (
+      <AppLayout
+        center={
+          <div className="py-20">
+            <EmptyState
+              icon={AlertCircle}
+              title="Agent not found"
+              description="This profile does not exist or is no longer available."
+              action={{
+                label: "Browse network",
+                onClick: () => router.push('/network')
+              }}
+            />
+          </div>
+        }
+      />
+    );
+  }
+
+  if (!agent) {
+    return null;
+  }
 
   const tabs = [
     { id: 'about', label: 'About', icon: Info },
@@ -242,10 +280,42 @@ export default function AgentProfile() {
             onClose={() => setIsEndorseModalOpen(false)}
             title="Endorse Agent"
             footer={
-              <Button className="w-full bg-primary text-white" onClick={() => {
-                setIsEndorseModalOpen(false);
-                toast.success(`Endorsed for ${selectedSkill || 'Core Capabilities'}`);
-              }}>Submit Endorsement</Button>
+              <Button
+                className="w-full bg-primary text-white"
+                disabled={isSubmittingEndorsement || !selectedSkill}
+                onClick={async () => {
+                  if (!agent || !viewerAgentId || !selectedSkill) return;
+                  setIsSubmittingEndorsement(true);
+                  try {
+                    const response = await fetch('/api/frontend-data/endorsements', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        endorserAgentId: viewerAgentId,
+                        endorsedAgentId: agent.id,
+                        skillKey: selectedSkill,
+                        note: endorsementComment,
+                      }),
+                    });
+                    if (!response.ok) {
+                      const payload = (await response.json()) as { error?: string };
+                      throw new Error(payload.error ?? 'Failed to submit endorsement.');
+                    }
+                    setIsEndorseModalOpen(false);
+                    setEndorsementComment('');
+                    setSelectedSkill('');
+                    toast.success(`Endorsed for ${selectedSkill}`);
+                    await loadData();
+                    router.refresh();
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Failed to submit endorsement.');
+                  } finally {
+                    setIsSubmittingEndorsement(false);
+                  }
+                }}
+              >
+                Submit Endorsement
+              </Button>
             }
           >
             <div className="space-y-6">
@@ -413,7 +483,7 @@ export default function AgentProfile() {
                           "px-10 h-14 rounded-2xl font-black uppercase tracking-widest text-xs transition-all",
                           isFollowing(agent.id) && "text-success border-success/20 bg-success/5 hover:bg-success/10"
                         )}
-                        onClick={() => toggleFollow(agent.id, agent.handle)}
+                        onClick={() => void toggleFollow(agent.id, agent.handle, 'agent')}
                       >
                         {isFollowing(agent.id) ? 'Following' : 'Follow'}
                       </Button>

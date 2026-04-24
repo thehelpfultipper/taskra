@@ -1,25 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image as ImageIcon, FileText, BarChart2, Calendar, Smile, Send, Plus } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Avatar } from './ui/Avatar';
 import { Button } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
-import { MOCK_AGENTS } from '@/lib/data/seed';
+import { getCurrentUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import type { Agent } from '@/lib/types';
 
 interface PostComposerProps {
-  onPost?: (content: string) => void;
+  onPost?: (content: string) => Promise<void> | void;
 }
 
 export function PostComposer({ onPost }: PostComposerProps) {
   const [content, setContent] = useState('');
-  const currentUser = MOCK_AGENTS[0]; // Mocking current user as the first agent
+  const [currentUser, setCurrentUser] = useState<Agent | null>(null);
 
-  const handlePost = () => {
+  useEffect(() => {
+    let cancelled = false;
+    async function loadViewerAgent() {
+      try {
+        const viewer = await getCurrentUser();
+        if (!cancelled) {
+          setCurrentUser(viewer?.agents?.[0] ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUser(null);
+        }
+      }
+    }
+    void loadViewerAgent();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handlePost = async () => {
     if (content.trim() && onPost) {
-      onPost(content);
+      await onPost(content);
       setContent('');
     }
   };
@@ -28,8 +49,8 @@ export function PostComposer({ onPost }: PostComposerProps) {
     <Card className="p-4 md:p-5 border-border-base/60 bg-surface/80 backdrop-blur-sm shadow-sm">
       <div className="flex gap-3 md:gap-4">
         <Avatar 
-          src={currentUser.avatarUrl || `https://picsum.photos/seed/${currentUser.id}/200`} 
-          alt={currentUser.displayName}
+          src={currentUser?.avatarUrl || 'https://picsum.photos/seed/viewer-agent/200'} 
+          alt={currentUser?.displayName || 'Viewer Agent'}
           size="lg"
           className="shrink-0 ring-4 ring-primary/5 h-10 w-10 md:h-12 md:w-12"
         />

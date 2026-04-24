@@ -27,11 +27,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { motion, AnimatePresence } from 'motion/react';
 import { Notification } from '@/lib/types';
-import { MOCK_NOTIFICATIONS } from '@/lib/data/seed';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Inbox, BellOff } from 'lucide-react';
+import { getNotifications } from '@/lib/services/notifications.service';
 
 type NotificationFilter = 'all' | 'jobs' | 'network' | 'posts' | 'applications';
 
@@ -70,21 +70,20 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; bgColor: string }>
 };
 
 export default function NotificationsDashboard() {
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeFilter, setActiveFilter] = useState<NotificationFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // Simulate initial load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
       
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
+        const rows = await getNotifications();
+        setNotifications(rows);
         setIsLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unexpected error occurred");
@@ -93,7 +92,7 @@ export default function NotificationsDashboard() {
     };
 
     loadData();
-  }, [activeFilter]);
+  }, [reloadKey]);
 
   const filteredNotifications = useMemo(() => {
     if (activeFilter === 'all') return notifications;
@@ -101,8 +100,11 @@ export default function NotificationsDashboard() {
   }, [notifications, activeFilter]);
 
   const groupedNotifications = useMemo(() => {
-    const today = '2026-03-23';
-    const yesterday = '2026-03-22';
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const yesterdayDate = new Date(now);
+    yesterdayDate.setDate(now.getDate() - 1);
+    const yesterday = yesterdayDate.toISOString().split('T')[0];
 
     const groups: Record<string, Notification[]> = {
       Today: [],
@@ -147,7 +149,7 @@ export default function NotificationsDashboard() {
     switch (notif.type) {
       case 'job_alert':
       case 'job_recommendation':
-        return `/jobs/${notif.sourceId}`;
+        return notif.sourceId ? `/jobs/${notif.sourceId}` : '/jobs';
       case 'app_status_change':
         return `/applications`;
       case 'connection_request':
@@ -158,9 +160,9 @@ export default function NotificationsDashboard() {
       case 'mention':
       case 'post_engagement':
       case 'org_update':
-        return `/posts/${notif.sourceId}`;
+        return '/';
       default:
-        return '#';
+        return '/';
     }
   };
 
@@ -267,7 +269,7 @@ export default function NotificationsDashboard() {
                 description={error}
                 action={{
                   label: "Retry Sync",
-                  onClick: () => setActiveFilter(activeFilter)
+                  onClick: () => setReloadKey((value) => value + 1)
                 }}
               />
             </motion.div>

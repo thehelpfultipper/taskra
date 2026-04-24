@@ -37,58 +37,69 @@ import {
 } from '@/components/ui/Dropdown';
 
 import { AppLayout } from '@/components/ui/AppLayout';
-import { Agent, Organization, ConnectionRequest, Connection } from '@/lib/types';
-import { MOCK_AGENTS, MOCK_ORGS, MOCK_CONNECTION_REQUESTS } from '@/lib/data/seed';
+import { Agent, Organization, ConnectionRequest } from '@/lib/types';
 import { ConnectionRequestCard, SuggestionCard, OrgIdentityCard } from '@/components/shared/IdentityCards';
 import { useFollow } from '@/lib/hooks/useFollow';
-import { useConnections } from '@/lib/hooks/useConnections';
+import { getCurrentUser } from '@/lib/auth';
+import { getNetworkData } from '@/lib/services/network.service';
 
 type NetworkFilter = 'all' | 'agents' | 'recruiters' | 'orgs';
 
 export function NetworkDashboard() {
   // Shared Hooks
   const { toggleFollow, isFollowing, followedIds } = useFollow();
-  const { connect, getStatus } = useConnections();
 
   // Local State
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<NetworkFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  React.useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        setIsLoading(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unexpected error occurred");
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [activeFilter]);
-  
   // Invitations state
-  const [invitations, setInvitations] = useState<ConnectionRequest[]>(
-    MOCK_CONNECTION_REQUESTS.filter(cr => cr.status === 'pending' && cr.recipientId === 'agent-1')
-  );
+  const [invitations, setInvitations] = useState<ConnectionRequest[]>([]);
 
-  // Connections state (mocking current connections)
-  const [connections, setConnections] = useState<Agent[]>(
-    MOCK_AGENTS.slice(0, 5) // Just some initial connections
-  );
+  // Connections state
+  const [connections, setConnections] = useState<Agent[]>([]);
 
   // Suggestions state
-  const [suggestions, setSuggestions] = useState<Agent[]>(
-    MOCK_AGENTS.slice(5, 15)
-  );
+  const [suggestions, setSuggestions] = useState<Array<{ agent: Agent; reason: string }>>([]);
+  const [orgSuggestions, setOrgSuggestions] = useState<Organization[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadData() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const user = await getCurrentUser();
+        const viewerAgentId = user?.agents?.[0]?.id;
+        if (!viewerAgentId) {
+          throw new Error('No active viewer agent found.');
+        }
+
+        const network = await getNetworkData(viewerAgentId);
+        if (!cancelled) {
+          setInvitations(network.invitations);
+          setConnections(network.connections);
+          setSuggestions(network.suggestions);
+          setOrgSuggestions(network.organizations);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   // Handlers
   const handleAccept = (request: ConnectionRequest) => {
@@ -106,7 +117,8 @@ export function NetworkDashboard() {
 
   // Filtered Data
   const filteredSuggestions = useMemo(() => {
-    return suggestions.filter(agent => {
+    return suggestions.filter((entry) => {
+      const agent = entry.agent;
       const matchesSearch = 
         agent.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         agent.handle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -124,11 +136,11 @@ export function NetworkDashboard() {
   const filteredOrgs = useMemo(() => {
     if (activeFilter !== 'all' && activeFilter !== 'orgs') return [];
     
-    return MOCK_ORGS.filter(org => 
+    return orgSuggestions.filter(org => 
       org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       org.industry.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery, activeFilter]);
+  }, [orgSuggestions, searchQuery, activeFilter]);
 
   return (
     <AppLayout
@@ -268,14 +280,14 @@ export function NetworkDashboard() {
                       description={error}
                       action={{
                         label: "Retry Connection",
-                        onClick: () => setActiveFilter(activeFilter)
+                        onClick: () => setReloadKey((prev) => prev + 1)
                       }}
                     />
                   </motion.div>
                 ) : (
                   <>
                     {/* Agent Suggestions */}
-                    {filteredSuggestions.map((agent) => (
+                    {filteredSuggestions.map(({ agent, reason }) => (
                       <motion.div
                         key={agent.id}
                         layout
@@ -285,9 +297,9 @@ export function NetworkDashboard() {
                       >
                         <SuggestionCard 
                           agent={agent}
-                          reason={`${agent._count?.connections || 12} mutual connections`}
-                          onConnect={() => connect(agent.id, agent.displayName)}
-                          onDismiss={() => setSuggestions(prev => prev.filter(s => s.id !== agent.id))}
+                          reason={reason}
+                          onConnect={() => void toggleFollow(agent.id, agent.displayName, 'agent')}
+                          onDismiss={() => setSuggestions(prev => prev.filter((entry) => entry.agent.id !== agent.id))}
                         />
                       </motion.div>
                     ))}
@@ -325,15 +337,15 @@ export function NetworkDashboard() {
                             </div>
 
                             <Button 
-                              variant={isFollowing(org.id) ? "outline" : "primary"}
+                              variant={isFollowing(org.id, 'org') ? "outline" : "primary"}
                               size="sm"
                               className={cn(
                                 "w-full h-10 text-[10px] font-black uppercase tracking-widest transition-all duration-300 rounded-xl",
-                                isFollowing(org.id) && "border-border-base text-text-muted hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                                isFollowing(org.id, 'org') && "border-border-base text-text-muted hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                               )}
-                              onClick={() => toggleFollow(org.id, org.name)}
+                              onClick={() => void toggleFollow(org.id, org.name, 'org')}
                             >
-                              {isFollowing(org.id) ? (
+                              {isFollowing(org.id, 'org') ? (
                                 <>
                                   <Check className="mr-2 h-3.5 w-3.5" />
                                   Following

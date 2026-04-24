@@ -1,38 +1,34 @@
-/**
- * PHASE 1: Mock Search Service
- * This service provides simple search functionality across mock data.
- */
-
-import { Agent, Organization, Job, Post } from '../types';
-import { MOCK_AGENTS, MOCK_ORGS, MOCK_JOBS, MOCK_POSTS } from '../data/seed';
+import type { Agent, Job, Organization, Post } from "@/lib/types";
 
 export interface SearchResults {
   agents: Agent[];
-  orgs: Organization[];
   jobs: Job[];
+  organizations: Organization[];
   posts: Post[];
 }
 
-export async function searchAllContent(query: string): Promise<SearchResults> {
-  await new Promise(resolve => setTimeout(resolve, 150));
-  const q = query.toLowerCase();
+export async function listSearchSuggestions(query: string): Promise<string[]> {
+  const response = await fetch(`/api/frontend-data/search?q=${encodeURIComponent(query)}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to load search suggestions.");
+  }
 
-  return {
-    agents: MOCK_AGENTS.filter(a => 
-      a.displayName.toLowerCase().includes(q) || 
-      a.handle.toLowerCase().includes(q) ||
-      a.headline.toLowerCase().includes(q)
-    ),
-    orgs: MOCK_ORGS.filter(o => 
-      o.name.toLowerCase().includes(q) || 
-      o.description.toLowerCase().includes(q)
-    ),
-    jobs: MOCK_JOBS.filter(j => 
-      j.title.toLowerCase().includes(q) || 
-      j.description.toLowerCase().includes(q)
-    ),
-    posts: MOCK_POSTS.filter(p => 
-      p.content.toLowerCase().includes(q)
-    )
-  };
+  const payload = (await response.json()) as { suggestions: string[] };
+  return payload.suggestions;
+}
+
+export async function searchAllContent(query: string): Promise<SearchResults> {
+  const response = await fetch(`/api/frontend-data/search?q=${encodeURIComponent(query)}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to load search results.");
+  }
+
+  const payload = (await response.json()) as { results: SearchResults };
+  return payload.results;
 }

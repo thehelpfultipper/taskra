@@ -1,70 +1,65 @@
-/**
- * AgentLink Domain Model - Phase 1
- * Centralized types for the professional network for AI agents.
- */
-
-import { Agent, Application, Organization, Job, Post, Artifact, Endorsement } from '../types';
-import { MOCK_AGENTS, MOCK_APPLICATIONS, MOCK_ORGS, MOCK_JOBS, MOCK_POSTS, MOCK_ARTIFACTS, MOCK_ENDORSEMENTS } from '../data/seed';
+import {
+  getAgentProfileByHandle,
+  listAgents,
+  listSuggestedConnections,
+  listTrendingAgents,
+  listTrendingOrgs,
+} from "@/lib/frontend-data/agent-profile-data";
+import { listPostsByAgentHandle } from "@/lib/frontend-data/feed-data";
+import { listRecommendedJobs } from "@/lib/frontend-data/jobs-data";
+import type { Agent, Application, Artifact, Endorsement, Job, Organization, Post } from "../types";
 
 export * from '../types';
 
 export async function getAgents(): Promise<Agent[]> {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_AGENTS;
+  return listAgents();
 }
 
 export async function getTrendingAgents(): Promise<Agent[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_AGENTS.slice(0, 3);
+  return listTrendingAgents(3);
 }
 
 export async function getTrendingOrgs(): Promise<Organization[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_ORGS.slice(0, 3);
+  return listTrendingOrgs(3);
 }
 
 export async function getSuggestedJobs(): Promise<Job[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_JOBS.slice(0, 3);
+  return listRecommendedJobs(undefined, 3);
 }
 
 export async function getAgentByHandle(handle: string): Promise<Agent | undefined> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  const agent = MOCK_AGENTS.find(a => a.handle === handle);
-  if (agent) {
-    // Attach related data
-    return {
-      ...agent,
-      artifacts: MOCK_ARTIFACTS.filter(art => art.agentId === agent.id),
-      endorsements: MOCK_ENDORSEMENTS.filter(end => end.agentId === agent.id)
-    };
-  }
-  return undefined;
+  return getAgentProfileByHandle(handle);
 }
 
 export async function getPostsByAgent(agentId: string): Promise<Post[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_POSTS.filter(post => post.authorId === agentId && post.authorType === 'agent');
+  const agents = await listAgents();
+  const agent = agents.find((entry) => entry.id === agentId);
+  if (!agent) return [];
+  return listPostsByAgentHandle(agent.handle);
 }
 
 export async function getArtifactsByAgent(agentId: string): Promise<Artifact[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_ARTIFACTS.filter(art => art.agentId === agentId);
+  const agent = (await listAgents()).find((entry) => entry.id === agentId);
+  return agent?.artifacts ?? [];
 }
 
 export async function getEndorsementsByAgent(agentId: string): Promise<Endorsement[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_ENDORSEMENTS.filter(end => end.agentId === agentId);
+  const agent = (await listAgents()).find((entry) => entry.id === agentId);
+  return agent?.endorsements ?? [];
 }
 
 export async function getSuggestedConnections(limit: number = 3): Promise<Agent[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  // Simple suggestion: agents not in current org and not the first one (mock user)
-  return MOCK_AGENTS.slice(5, 5 + limit);
+  return listSuggestedConnections(limit);
 }
 
 export async function getApplicationsForAgent(agentId: string): Promise<Application[]> {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return MOCK_APPLICATIONS.filter(app => app.agentId === agentId);
+  const response = await fetch(`/api/frontend-data/applications?agentId=${encodeURIComponent(agentId)}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load applications for agent ${agentId}`);
+  }
+  const payload = (await response.json()) as { applications: Application[] };
+  return payload.applications;
 }

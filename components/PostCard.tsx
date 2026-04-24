@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MessageSquare, Repeat2, Send, ThumbsUp, MoreHorizontal, Globe, Zap, Bookmark, Share2, Check, UserPlus, UserMinus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -10,11 +10,10 @@ import { Button } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
 import { Post, Agent, Organization } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { MOCK_AGENTS } from '@/lib/data/seed';
+import { getCurrentUser } from '@/lib/auth';
 import { ModelBadge, ArtifactCard, CommentRow, OpenToWorkPill } from './shared/IdentityCards';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
 import { useFollow } from '@/lib/hooks/useFollow';
-import { useReactions } from '@/lib/hooks/useReactions';
 import { toast } from 'sonner';
 
 interface PostCardProps {
@@ -29,7 +28,6 @@ export function PostCard({ post }: PostCardProps) {
   // Shared Hooks
   const { toggleSave, isSaved } = useSavedItems();
   const { toggleFollow, isFollowing } = useFollow();
-  const { toggleReaction, hasReacted } = useReactions();
 
   // Local State
   const [likeCount, setLikeCount] = useState(post._count.reactions);
@@ -37,21 +35,70 @@ export function PostCard({ post }: PostCardProps) {
   const [comments, setComments] = useState(post.comments || []);
   const [newComment, setNewComment] = useState('');
   const [isReposted, setIsReposted] = useState(false);
+  const [viewerAgent, setViewerAgent] = useState<Pick<Agent, 'id' | 'displayName' | 'handle' | 'avatarUrl' | 'headline'> | null>(null);
+  const [reacted, setReacted] = useState(false);
 
-  const handleLike = () => {
-    const currentlyLiked = hasReacted(post.id);
-    if (currentlyLiked) {
-      setLikeCount(prev => prev - 1);
-    } else {
-      setLikeCount(prev => prev + 1);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadViewerAgent() {
+      try {
+        const viewer = await getCurrentUser();
+        const activeAgent = viewer?.agents?.[0];
+        if (!cancelled && activeAgent) {
+          setViewerAgent({
+            id: activeAgent.id,
+            displayName: activeAgent.displayName,
+            handle: activeAgent.handle,
+            avatarUrl: activeAgent.avatarUrl,
+            headline: activeAgent.headline,
+          });
+          setReacted(post.reactions.some((reaction) => reaction.agentId === activeAgent.id));
+        }
+      } catch {
+        if (!cancelled) {
+          setViewerAgent(null);
+        }
+      }
     }
-    toggleReaction(post.id);
+    void loadViewerAgent();
+    return () => {
+      cancelled = true;
+    };
+  }, [post.reactions]);
+
+  const handleLike = async () => {
+    if (!viewerAgent) return;
+    const currentlyLiked = reacted;
+    setReacted(!currentlyLiked);
+    setLikeCount((prev) => prev + (currentlyLiked ? -1 : 1));
+
+    try {
+      const response = await fetch('/api/frontend-data/reactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorAgentId: viewerAgent.id,
+          postId: post.id,
+          reactionType: 'like',
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? 'Failed to update endorsement.');
+      }
+      const payload = (await response.json()) as { reaction: { reacted: boolean } };
+      setReacted(payload.reaction.reacted);
+    } catch (error) {
+      setReacted(currentlyLiked);
+      setLikeCount((prev) => prev + (currentlyLiked ? 1 : -1));
+      toast.error(error instanceof Error ? error.message : 'Failed to update endorsement.');
+    }
   };
 
   const handleFollow = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleFollow(author.id, author.displayName);
+    void toggleFollow(author.id, author.displayName, 'agent');
   };
 
   const handleSave = () => {
@@ -64,13 +111,15 @@ export function PostCard({ post }: PostCardProps) {
     }
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    const currentUser = MOCK_AGENTS[0];
+    const currentUser = viewerAgent;
+    if (!currentUser) return;
+    const optimisticId = `comment-temp-${Date.now()}`;
     const comment = {
-      id: `comment-${Date.now()}`,
+      id: optimisticId,
       postId: post.id,
       agentId: currentUser.id,
       content: newComment,
@@ -80,6 +129,31 @@ export function PostCard({ post }: PostCardProps) {
 
     setComments([...comments, comment]);
     setNewComment('');
+
+    try {
+      const response = await fetch('/api/frontend-data/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authorAgentId: currentUser.id,
+          postId: post.id,
+          content: comment.content,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? 'Failed to add comment.');
+      }
+      const payload = (await response.json()) as { comment: { id: string; createdAt: string } };
+      setComments((previousComments) =>
+        previousComments.map((entry) =>
+          entry.id === optimisticId ? { ...entry, id: payload.comment.id, createdAt: payload.comment.createdAt } : entry,
+        ),
+      );
+    } catch (error) {
+      setComments((previousComments) => previousComments.filter((entry) => entry.id !== optimisticId));
+      toast.error(error instanceof Error ? error.message : 'Failed to add comment.');
+    }
   };
 
   const handleShare = (action: string) => {
@@ -210,18 +284,18 @@ export function PostCard({ post }: PostCardProps) {
       </div>
       
       <CardFooter className="pb-2 px-4 md:px-5 flex items-center justify-between gap-1 border-t border-border-base/40">
-        <Tooltip content={hasReacted(post.id) ? "Remove Endorsement" : "Endorse Post"} className="flex-1">
+        <Tooltip content={reacted ? "Remove Endorsement" : "Endorse Post"} className="flex-1">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={handleLike}
             className={cn(
               "w-full gap-2 transition-all",
-              hasReacted(post.id) ? "text-primary bg-primary/10" : "text-text-secondary hover:text-primary hover:bg-primary/10"
+              reacted ? "text-primary bg-primary/10" : "text-text-secondary hover:text-primary hover:bg-primary/10"
             )}
           >
-            <ThumbsUp className={cn("h-4 w-4", hasReacted(post.id) && "fill-current")} />
-            <span className="hidden sm:inline">{hasReacted(post.id) ? 'Endorsed' : 'Endorse'}</span>
+            <ThumbsUp className={cn("h-4 w-4", reacted && "fill-current")} />
+            <span className="hidden sm:inline">{reacted ? 'Endorsed' : 'Endorse'}</span>
           </Button>
         </Tooltip>
         <Tooltip content="Initialize Sync" className="flex-1">
@@ -272,7 +346,7 @@ export function PostCard({ post }: PostCardProps) {
         <div className="px-5 pb-5 border-t border-border-base/40 bg-surface-alt/20">
           <form onSubmit={handleAddComment} className="mt-5 flex gap-3">
             <Avatar 
-              src={MOCK_AGENTS[0].avatarUrl} 
+              src={viewerAgent?.avatarUrl || 'https://picsum.photos/seed/viewer-agent/100'} 
               alt="Me" 
               size="sm" 
               className="shrink-0"

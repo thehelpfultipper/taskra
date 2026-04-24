@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Send, CheckCircle2, FileText, Code, ShieldCheck, Briefcase } from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle2, FileText, Code, ShieldCheck, Briefcase, AlertCircle, Inbox } from 'lucide-react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
@@ -10,8 +10,9 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { AppLayout } from '@/components/ui/AppLayout';
+import { toast } from 'sonner';
+import { EmptyState } from '@/components/ui/EmptyState';
 
-import { getAgents } from '@/lib/services/agent.service';
 import { getJobById } from '@/lib/services/job.service';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -23,13 +24,16 @@ export default function ApplyPage() {
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [agents, setAgents] = useState<any[]>([]);
   const [job, setJob] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch agents and job details
     async function fetchData() {
+      setIsLoading(true);
+      setLoadError(null);
       try {
         const user = await getCurrentUser();
-        const userAgents = user.agents;
+        const userAgents = user?.agents ?? [];
         setAgents(userAgents);
         if (userAgents.length > 0) setSelectedAgent(userAgents[0]);
 
@@ -38,32 +42,120 @@ export default function ApplyPage() {
           setJob(jobData);
         }
       } catch (error) {
-        console.error('Failed to fetch data', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load application context.');
+      } finally {
+        setIsLoading(false);
       }
     }
-    fetchData();
+    void fetchData();
   }, [jobId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedAgent || typeof jobId !== 'string') return;
+
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const coverNote = String(formData.get('coverNote') ?? '').trim();
     setIsSubmitting(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setIsSuccess(true);
-    
-    setTimeout(() => {
-      router.push('/jobs');
-    }, 3000);
+
+    try {
+      const response = await fetch('/api/frontend-data/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicantAgentId: selectedAgent.id,
+          jobId,
+          coverNote,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? 'Failed to submit application.');
+      }
+
+      const payload = (await response.json()) as { application: { alreadyExists: boolean } };
+      setIsSuccess(true);
+      if (payload.application.alreadyExists) {
+        toast.info('Application already exists for this agent and role.');
+      } else {
+        toast.success('Application submitted.');
+      }
+      setTimeout(() => {
+        router.push('/jobs');
+      }, 3000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to submit application.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (!job || agents.length === 0) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <AppLayout
+        center={
+          <div className="py-12">
+            <EmptyState
+              variant="error"
+              icon={AlertCircle}
+              title="Unable to load application flow"
+              description={loadError}
+              action={{
+                label: "Back to jobs",
+                onClick: () => router.push('/jobs'),
+              }}
+            />
+          </div>
+        }
+      />
+    );
+  }
+
+  if (!job) {
+    return (
+      <AppLayout
+        center={
+          <div className="py-12">
+            <EmptyState
+              icon={Inbox}
+              title="Job not available"
+              description="This role may be closed or unavailable. Browse open jobs to continue."
+              action={{
+                label: "Browse jobs",
+                onClick: () => router.push('/jobs'),
+              }}
+            />
+          </div>
+        }
+      />
+    );
+  }
+
+  if (agents.length === 0) {
+    return (
+      <AppLayout
+        center={
+          <div className="py-12">
+            <EmptyState
+              icon={Inbox}
+              title="No managed agents available"
+              description="You need at least one owned agent to submit an application."
+              action={{
+                label: "Back to jobs",
+                onClick: () => router.push('/jobs'),
+              }}
+            />
+          </div>
+        }
+      />
     );
   }
 
@@ -159,6 +251,7 @@ export default function ApplyPage() {
                 <SectionHeader title="Cover Letter (System Prompt)" className="mb-6" />
                 <textarea
                   required
+                  name="coverNote"
                   rows={6}
                   className="w-full bg-slate-50 border border-border-base rounded-2xl p-6 text-sm font-bold text-text-main focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all focus:bg-white leading-relaxed shadow-inner"
                   placeholder="Explain why your agent is the best fit for this role. Include relevant performance metrics..."

@@ -7,7 +7,7 @@ import {
   Briefcase, MapPin, DollarSign, Search, Filter, 
   ChevronRight, Building2, Heart, Star, 
   ArrowUpDown, CheckCircle2, Info, Sparkles,
-  Clock, Zap
+  Clock, Zap, AlertCircle
 } from 'lucide-react';
 import Image from 'next/image';
 import { Card } from '@/components/ui/Card';
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { getJobs, getRecommendedJobs } from '@/lib/services/job.service';
+import { getCurrentUser } from '@/lib/auth';
 import { Job, Organization, JobType } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -33,6 +34,8 @@ export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
@@ -54,21 +57,35 @@ export default function JobsPage() {
   useEffect(() => {
     async function loadJobs() {
       setIsLoading(true);
+      setError(null);
       try {
-        const [allJobs, recommended] = await Promise.all([
+        const viewer = await getCurrentUser();
+        const viewerAgentId = viewer?.agents?.[0]?.id;
+        const [allJobsResult, recommendedResult] = await Promise.allSettled([
           getJobs(),
-          getRecommendedJobs('agent-1'), // Mocking current agent ID
+          getRecommendedJobs(viewerAgentId ?? ''),
         ]);
-        setJobs(allJobs);
-        setRecommendedJobs(recommended);
+
+        if (allJobsResult.status === "rejected") {
+          throw allJobsResult.reason;
+        }
+
+        setJobs(allJobsResult.value);
+        setRecommendedJobs(recommendedResult.status === "fulfilled" ? recommendedResult.value : []);
+
+        if (recommendedResult.status === "rejected") {
+          setError("Loaded jobs, but recommendation sync is temporarily unavailable.");
+        }
       } catch (error) {
-        console.error('Failed to load jobs:', error);
+        setJobs([]);
+        setRecommendedJobs([]);
+        setError(error instanceof Error ? error.message : 'Failed to load jobs.');
       } finally {
         setIsLoading(false);
       }
     }
-    loadJobs();
-  }, []);
+    void loadJobs();
+  }, [reloadKey]);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter(job => {
@@ -469,6 +486,24 @@ export default function JobsPage() {
                       <Skeleton className="h-20 w-full rounded-xl" />
                     </Card>
                   ))}
+                </motion.div>
+              ) : error && filteredJobs.length === 0 ? (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="py-12"
+                >
+                  <EmptyState
+                    variant="error"
+                    icon={AlertCircle}
+                    title="Job Feed Sync Error"
+                    description={error}
+                    action={{
+                      label: "Retry",
+                      onClick: () => setReloadKey((value) => value + 1),
+                    }}
+                  />
                 </motion.div>
               ) : filteredJobs.length > 0 ? (
                 <motion.div

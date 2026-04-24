@@ -20,13 +20,9 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { 
-  MOCK_AGENTS, 
-  MOCK_JOBS, 
-  MOCK_ORGS, 
-  MOCK_POSTS 
-} from '@/lib/data/seed';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
+import { resolveSavedItemRefs } from '@/lib/services/saved.service';
+import type { ResolvedSavedItems } from '@/lib/frontend-data/saved-data';
 import { 
   AgentResultCard, 
   JobResultCard, 
@@ -44,56 +40,64 @@ export default function SavedDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [resolvedSaved, setResolvedSaved] = useState<ResolvedSavedItems>({
+    agents: [],
+    jobs: [],
+    organizations: [],
+    posts: [],
+    unresolvedRefs: [],
+  });
 
-  // Simulate initial load
+  // Resolve local saved refs against backend-backed data.
   useEffect(() => {
+    let cancelled = false;
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        setIsLoading(false);
+        const resolved = await resolveSavedItemRefs(
+          savedItems.map((item) => ({
+            itemId: item.itemId,
+            itemType: item.itemType,
+          })),
+        );
+        if (!cancelled) {
+          setResolvedSaved(resolved);
+          setIsLoading(false);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "An unexpected error occurred");
-        setIsLoading(false);
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "An unexpected error occurred");
+          setIsLoading(false);
+        }
       }
     };
 
-    loadData();
-  }, [activeTab]);
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [savedItems, reloadKey]);
 
   const savedData = useMemo(() => {
     const q = searchQuery.toLowerCase();
 
-    const agents = savedItems
-      .filter(i => i.itemType === 'agent')
-      .map(i => MOCK_AGENTS.find(a => a.id === i.itemId))
-      .filter(Boolean)
+    const agents = resolvedSaved.agents
       .filter(a => !q || a!.displayName.toLowerCase().includes(q) || a!.headline.toLowerCase().includes(q));
       
-    const jobs = savedItems
-      .filter(i => i.itemType === 'job')
-      .map(i => MOCK_JOBS.find(j => j.id === i.itemId))
-      .filter(Boolean)
+    const jobs = resolvedSaved.jobs
       .filter(j => !q || j!.title.toLowerCase().includes(q) || j!.org.name?.toLowerCase().includes(q));
       
-    const organizations = savedItems
-      .filter(i => i.itemType === 'organization')
-      .map(i => MOCK_ORGS.find(o => o.id === i.itemId))
-      .filter(Boolean)
+    const organizations = resolvedSaved.organizations
       .filter(o => !q || o!.name.toLowerCase().includes(q) || o!.industry.toLowerCase().includes(q));
       
-    const posts = savedItems
-      .filter(i => i.itemType === 'post')
-      .map(i => MOCK_POSTS.find(p => p.id === i.itemId))
-      .filter(Boolean)
+    const posts = resolvedSaved.posts
       .filter(p => !q || p!.content.toLowerCase().includes(q) || p!.author.displayName.toLowerCase().includes(q));
 
     return { agents, jobs, organizations, posts };
-  }, [savedItems, searchQuery]);
+  }, [resolvedSaved, searchQuery]);
 
   const handleToggleSave = (e: React.MouseEvent, itemId: string, type: any) => {
     e.stopPropagation();
@@ -180,6 +184,13 @@ export default function SavedDashboard() {
 
       {/* Content */}
       <div className="space-y-12">
+        {resolvedSaved.unresolvedRefs.length > 0 && (
+          <div className="px-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-text-muted/50">
+              {resolvedSaved.unresolvedRefs.length} saved {resolvedSaved.unresolvedRefs.length === 1 ? 'item is' : 'items are'} unavailable in the current backend snapshot.
+            </p>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.div
@@ -226,7 +237,10 @@ export default function SavedDashboard() {
                 description={error}
                 action={{
                   label: "Try Again",
-                  onClick: () => setActiveTab(activeTab)
+                  onClick: () => {
+                    setError(null);
+                    setReloadKey((prev) => prev + 1);
+                  }
                 }}
               />
             </motion.div>

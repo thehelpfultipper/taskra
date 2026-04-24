@@ -29,7 +29,6 @@ import { Input } from '@/components/ui/Input';
 import { Tabs } from '@/components/ui/Tabs';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { Modal } from '@/components/ui/Modal';
-import { MOCK_APPLICATIONS } from '@/lib/data/seed';
 import { Application, ApplicationStatus } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
@@ -64,6 +63,7 @@ export default function ApplicationsPage() {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -72,23 +72,39 @@ export default function ApplicationsPage() {
       
       try {
         const user = await getCurrentUser();
-        const allApps: Application[] = [];
-        
-        for (const agent of user.agents) {
-          const agentApps = await getApplicationsForAgent(agent.id);
-          allApps.push(...agentApps);
+        if (!user?.agents?.length) {
+          setApplications([]);
+          setError("No managed agents are available yet.");
+          return;
         }
-        
-        setApplications(allApps);
-        setIsLoading(false);
+
+        const results = await Promise.allSettled(user.agents.map((agent) => getApplicationsForAgent(agent.id)));
+        const allApps: Application[] = [];
+        let failedLoads = 0;
+
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            allApps.push(...result.value);
+          } else {
+            failedLoads += 1;
+          }
+        }
+
+        const uniqueApps = Array.from(new Map(allApps.map((app) => [app.id, app])).values());
+        setApplications(uniqueApps);
+
+        if (failedLoads > 0) {
+          setError(`Loaded partial application data. ${failedLoads} source${failedLoads === 1 ? "" : "s"} failed to sync.`);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      } finally {
         setIsLoading(false);
       }
     };
 
-    loadData();
-  }, [activeTab]);
+    void loadData();
+  }, [reloadKey]);
 
   const filteredAndSortedApplications = useMemo(() => {
     let result = applications.filter(app => {
@@ -124,32 +140,18 @@ export default function ApplicationsPage() {
   }, [applications]);
 
   const handleWithdraw = (id: string) => {
-    setApplications(prev => prev.map(app => 
-      app.id === id ? { ...app, status: ApplicationStatus.WITHDRAWN, updatedAt: new Date().toISOString() } : app
-    ));
-    toast.success('Application withdrawn successfully');
+    void id;
+    toast.info('Status updates are backend-driven in MVP; manual withdraw is not supported here yet.');
   };
 
   const handleDuplicate = (app: Application) => {
-    setApplications(prev => {
-      const timestamp = Date.now();
-      const newApp: Application = {
-        ...app,
-        id: `app-dup-${timestamp}`,
-        status: ApplicationStatus.DRAFT,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        jobId: app.jobId,
-        agentId: app.agentId,
-      };
-      return [newApp, ...prev];
-    });
-    toast.success('Draft application duplicated');
+    void app;
+    toast.info('Application duplication is not supported in MVP.');
   };
 
   const handleDelete = (id: string) => {
-    setApplications(prev => prev.filter(app => app.id !== id));
-    toast.success('Application deleted');
+    void id;
+    toast.info('Application deletion is not supported in MVP.');
   };
 
   const tabs = [
@@ -276,7 +278,7 @@ export default function ApplicationsPage() {
                 description={error}
                 action={{
                   label: "Try Reconnecting",
-                  onClick: () => setActiveTab(activeTab)
+                  onClick: () => setReloadKey((value) => value + 1)
                 }}
               />
             </motion.div>

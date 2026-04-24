@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
   Search as SearchIcon, 
@@ -25,22 +25,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
-import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Tabs } from '@/components/ui/Tabs';
-import { Input } from '@/components/ui/Input';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { 
-  MOCK_AGENTS, 
-  MOCK_JOBS, 
-  MOCK_ORGS, 
-  MOCK_POSTS 
-} from '@/lib/data/seed';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
-import { Agent, Job, Organization, Post, AvailabilityStatus } from '@/lib/types';
-import { formatDistanceToNow } from 'date-fns';
+import type { SearchResults } from '@/lib/services/search.service';
+import { listSearchSuggestions, searchAllContent } from '@/lib/services/search.service';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -63,6 +53,13 @@ export default function SearchDashboard() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
+  const [results, setResults] = useState<SearchResults>({
+    agents: [],
+    jobs: [],
+    organizations: [],
+    posts: [],
+  });
   const searchRef = React.useRef<HTMLDivElement>(null);
   const { toggleSave, isSaved } = useSavedItems();
 
@@ -77,41 +74,47 @@ export default function SearchDashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Real-time suggestions based on query
-  const liveSuggestions = useMemo(() => {
-    if (!query.trim() || query.length < 2) return [];
-    
-    const q = query.toLowerCase();
-    const suggestions: string[] = [];
-    
-    // Extract potential suggestions from mock data
-    MOCK_AGENTS.forEach(a => {
-      if (a.displayName.toLowerCase().includes(q)) suggestions.push(a.displayName);
-      a.specialties.forEach(s => {
-        if (s.toLowerCase().includes(q)) suggestions.push(s);
-      });
-    });
-    
-    MOCK_JOBS.forEach(j => {
-      if (j.title.toLowerCase().includes(q)) suggestions.push(j.title);
-    });
-
-    MOCK_ORGS.forEach(o => {
-      if (o.name.toLowerCase().includes(q)) suggestions.push(o.name);
-    });
-
-    // Unique and limited to 5
-    return Array.from(new Set(suggestions)).slice(0, 5);
-  }, [query]);
-
-  // Simulate search loading
+  // Backend-backed search and suggestions
   useEffect(() => {
-    if (query) {
-      setIsLoading(true);
-      const timer = setTimeout(() => setIsLoading(false), 600);
-      return () => clearTimeout(timer);
+    let cancelled = false;
+    if (!query.trim() || query.trim().length < 2) {
+      setIsLoading(false);
+      setLiveSuggestions([]);
+      setResults({ agents: [], jobs: [], organizations: [], posts: [] });
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [query, activeTab]);
+
+    setIsLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const [nextResults, nextSuggestions] = await Promise.all([
+          searchAllContent(query),
+          listSearchSuggestions(query),
+        ]);
+        if (!cancelled) {
+          setResults(nextResults);
+          setLiveSuggestions(nextSuggestions);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setResults({ agents: [], jobs: [], organizations: [], posts: [] });
+          setLiveSuggestions([]);
+          toast.error(error instanceof Error ? error.message : 'Failed to load search results');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   const handleToggleSave = (e: React.MouseEvent, itemId: string, type: any) => {
     e.stopPropagation();
@@ -143,45 +146,6 @@ export default function SearchDashboard() {
   useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
-
-  const results = useMemo(() => {
-    if (!query.trim()) return { agents: [], jobs: [], organizations: [], posts: [] };
-
-    const q = query.toLowerCase();
-
-    const filteredAgents = MOCK_AGENTS.filter(a => 
-      a.displayName.toLowerCase().includes(q) || 
-      a.handle.toLowerCase().includes(q) || 
-      a.headline.toLowerCase().includes(q) ||
-      a.specialties.some(s => s.toLowerCase().includes(q))
-    );
-
-    const filteredJobs = MOCK_JOBS.filter(j => 
-      j.title.toLowerCase().includes(q) || 
-      j.description.toLowerCase().includes(q) ||
-      j.org.name?.toLowerCase().includes(q) ||
-      j.requirements.some(r => r.toLowerCase().includes(q))
-    );
-
-    const filteredOrgs = MOCK_ORGS.filter(o => 
-      o.name.toLowerCase().includes(q) || 
-      o.description.toLowerCase().includes(q) ||
-      o.industry.toLowerCase().includes(q)
-    );
-
-    const filteredPosts = MOCK_POSTS.filter(p => 
-      p.content.toLowerCase().includes(q) ||
-      p.author.displayName.toLowerCase().includes(q) ||
-      p.tags?.some(t => t.toLowerCase().includes(q))
-    );
-
-    return {
-      agents: filteredAgents,
-      jobs: filteredJobs,
-      organizations: filteredOrgs,
-      posts: filteredPosts
-    };
-  }, [query]);
 
   const totalResults = results.agents.length + results.jobs.length + results.organizations.length + results.posts.length;
 

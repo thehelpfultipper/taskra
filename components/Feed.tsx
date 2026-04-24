@@ -11,24 +11,14 @@ import { ChevronDown, Sparkles, Users, Clock, Inbox, AlertCircle } from 'lucide-
 import { Post } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<'for-you' | 'following' | 'recent'>('for-you');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const getLocallyFollowedIds = useCallback((): string[] => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = window.localStorage.getItem('agentlink_followed_ids');
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, []);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const loadPosts = useCallback(async (tab: 'for-you' | 'following' | 'recent') => {
     setIsLoading(true);
@@ -40,7 +30,6 @@ export default function Feed() {
       const fetchedPosts = await getPosts({
         mode: tab,
         viewerAgentId,
-        followedIds: getLocallyFollowedIds(),
       });
       setPosts(fetchedPosts);
     } catch (err) {
@@ -48,17 +37,19 @@ export default function Feed() {
     } finally {
       setIsLoading(false);
     }
-  }, [getLocallyFollowedIds]);
+  }, []);
 
   useEffect(() => {
     void loadPosts(activeTab);
-  }, [activeTab, loadPosts]);
+  }, [activeTab, loadPosts, reloadKey]);
 
   const handleNewPost = async (content: string) => {
     const user = await getCurrentUser();
-    const currentUser = user.agents[0];
+    const currentUser = user?.agents?.[0];
+    if (!currentUser) return;
+    const optimisticId = `post-temp-${Date.now()}`;
     const newPost: Post = {
-      id: `post-${Date.now()}`,
+      id: optimisticId,
       authorId: currentUser.id,
       authorType: 'agent',
       author: {
@@ -76,6 +67,31 @@ export default function Feed() {
       comments: []
     };
     setPosts((previousPosts) => [newPost, ...previousPosts]);
+
+    try {
+      const response = await fetch('/api/frontend-data/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authorAgentId: currentUser.id,
+          content,
+          orgId: currentUser.currentOrg?.id ?? null,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? 'Failed to publish post.');
+      }
+      const payload = (await response.json()) as { post: { id: string; createdAt: string } };
+      setPosts((previousPosts) =>
+        previousPosts.map((entry) =>
+          entry.id === optimisticId ? { ...entry, id: payload.post.id, createdAt: payload.post.createdAt } : entry,
+        ),
+      );
+    } catch {
+      setPosts((previousPosts) => previousPosts.filter((entry) => entry.id !== optimisticId));
+      toast.error('Unable to publish your post right now. Please try again.');
+    }
   };
 
   return (
@@ -161,11 +177,7 @@ export default function Feed() {
                 action={{
                   label: "Try Reconnecting",
                   onClick: () => {
-                    setIsLoading(true);
-                    setError(null);
-                    setTimeout(() => {
-                      void loadPosts(activeTab);
-                    }, 1000);
+                    setReloadKey((value) => value + 1);
                   }
                 }}
               />

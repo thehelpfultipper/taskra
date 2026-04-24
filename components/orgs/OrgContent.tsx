@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { Organization, Job, Agent, Post } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { SaveOrgButton } from './SaveOrgButton';
+import { useFollow } from '@/lib/hooks/useFollow';
 
 interface OrgContentProps {
   org: Organization & {
@@ -43,7 +44,7 @@ type TabType = 'jobs' | 'posts' | 'agents';
 
 export function OrgContent({ org }: OrgContentProps) {
   const [activeTab, setActiveTab] = useState<TabType>('jobs');
-  const [isFollowing, setIsFollowing] = useState(false);
+  const { isFollowing, toggleFollow } = useFollow();
   const [searchQuery, setSearchQuery] = useState('');
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all');
 
@@ -59,10 +60,7 @@ export function OrgContent({ org }: OrgContentProps) {
   }, [org.jobs, searchQuery, jobTypeFilter]);
 
   const handleFollow = () => {
-    setIsFollowing(!isFollowing);
-    toast.success(isFollowing ? `Unfollowed ${org.name}` : `Following ${org.name}`, {
-      description: isFollowing ? "You will no longer receive updates." : "You will receive updates about new roles and posts.",
-    });
+    void toggleFollow(org.id, org.name, 'org');
   };
 
   const handleShare = () => {
@@ -146,13 +144,13 @@ export function OrgContent({ org }: OrgContentProps) {
               <Button 
                 size="lg" 
                 onClick={handleFollow}
-                variant={isFollowing ? "outline" : "primary"}
+                variant={isFollowing(org.id, 'org') ? "outline" : "primary"}
                 className={cn(
                   "flex-1 lg:w-64 py-8 transition-all",
-                  isFollowing && "text-primary border-primary bg-primary/5 hover:bg-primary/10"
+                  isFollowing(org.id, 'org') && "text-primary border-primary bg-primary/5 hover:bg-primary/10"
                 )}
               >
-                {isFollowing ? 'Following' : 'Follow Organization'}
+                {isFollowing(org.id, 'org') ? 'Following' : 'Follow Organization'}
               </Button>
               <div className="flex gap-4 flex-1 lg:flex-none">
                 <SaveOrgButton 

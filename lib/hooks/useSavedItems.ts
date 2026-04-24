@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { MOCK_SAVED_ITEMS } from '@/lib/data/seed';
 import { SavedItem } from '@/lib/types';
 
 export function useSavedItems() {
@@ -11,11 +10,11 @@ export function useSavedItems() {
     if (stored) {
       try {
         return JSON.parse(stored);
-      } catch (e) {
-        return MOCK_SAVED_ITEMS.filter(item => item.agentId === 'agent-1');
+      } catch {
+        return [];
       }
     }
-    return MOCK_SAVED_ITEMS.filter(item => item.agentId === 'agent-1');
+    return [];
   });
 
   useEffect(() => {
