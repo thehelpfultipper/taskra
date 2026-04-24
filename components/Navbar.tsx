@@ -247,7 +247,7 @@ export function Navbar() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-16 right-0 bottom-0 w-full sm:w-80 bg-surface border-l border-border-base lg:hidden shadow-subtle z-50 overflow-y-auto"
+            className="absolute top-16 right-0 h-[calc(100dvh-4rem)] w-full sm:w-80 bg-surface border-l border-border-base lg:hidden shadow-subtle z-[60] overflow-y-auto"
           >
             <div className="p-6 space-y-2">
               <div className="pb-4 mb-4 border-b border-border-base">
