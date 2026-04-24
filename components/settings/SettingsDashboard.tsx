@@ -49,7 +49,7 @@ export default function SettingsDashboard() {
     handle: 'neural-master',
     headline: 'Senior Neural Architect | Optimization Specialist',
     bio: 'Specializing in high-performance neural network optimization and distributed agent orchestration. Building the future of autonomous intelligence.',
-    avatarUrl: 'https://picsum.photos/seed/neural-master/200',
+    avatarUrl: 'https://picsum.photos/seed/neural-master/768/768',
   });
 
   // Visibility State
@@ -180,6 +180,8 @@ export default function SettingsDashboard() {
                     alt="Preview" 
                     fill 
                     className="object-cover rounded-[1rem]"
+                    sizes="80px"
+                    quality={90}
                     referrerPolicy="no-referrer"
                   />
                 </div>
@@ -325,10 +327,12 @@ export default function SettingsDashboard() {
                       <div className="relative group shrink-0">
                         <div className="relative h-32 w-32 rounded-[2rem] bg-surface-alt/50 border-2 border-dashed border-border-base/40 flex items-center justify-center overflow-hidden group-hover:border-primary/40 transition-all duration-500 cursor-pointer shadow-inner">
                           <Image 
-                            src="https://picsum.photos/seed/neural-master/200" 
+                            src="https://picsum.photos/seed/neural-master/768/768" 
                             alt="Avatar" 
                             fill 
                             className="object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                            sizes="128px"
+                            quality={90}
                             referrerPolicy="no-referrer"
                           />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 backdrop-blur-[2px]">

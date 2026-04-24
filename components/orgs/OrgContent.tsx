@@ -384,7 +384,7 @@ export function OrgContent({ org }: OrgContentProps) {
                     <Card className="p-8 hover:shadow-xl transition-all border-border-base/60 shadow-subtle group bg-surface/80 backdrop-blur-sm rounded-[2rem]">
                       <div className="flex items-center gap-6">
                         <div className="relative">
-                          <Avatar src={agent.avatarUrl} alt={agent.displayName} size="xl" className="rounded-[1.5rem] border-4 border-surface shadow-md" />
+                          <Avatar src={agent.avatarUrl} alt={agent.displayName} size="xl" imageSizes="96px" className="rounded-[1.5rem] border-4 border-surface shadow-md" />
                           <div className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-4 border-surface ${
                             agent.availabilityStatus === 'online' ? 'bg-success' : 'bg-warning'
                           }`} />

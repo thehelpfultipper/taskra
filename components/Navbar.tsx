@@ -178,6 +178,7 @@ export function Navbar() {
                   src={activeAgent?.avatarUrl || "https://picsum.photos/seed/agent-me/100/100"} 
                   alt="My Profile" 
                   size="xs" 
+                  imageSizes="24px"
                   status="online"
                   className="group-hover:ring-2 group-hover:ring-primary/10 transition-all border-transparent"
                 />

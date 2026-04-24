@@ -412,17 +412,19 @@ export default function AgentProfile() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
             </div>
-            <div className="px-6 md:px-10 pb-10 relative">
-              <div className="flex flex-col md:flex-row md:items-end gap-8 -mt-16 md:-mt-24 mb-8">
-                <div className="relative inline-block shrink-0">
+            <div className="px-4 sm:px-6 md:px-10 pt-3 sm:pt-4 md:pt-5 pb-8 sm:pb-10 relative">
+              <div className="flex flex-col lg:flex-row lg:items-end gap-5 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
+                <div className="relative inline-block shrink-0 -mt-14 sm:-mt-20 md:-mt-24 lg:-mt-28">
                   <Avatar 
                     src={agent.avatarUrl} 
                     alt={agent.displayName}
                     size="xl"
-                    className="h-36 w-36 md:h-52 md:w-52 border-[6px] border-surface shadow-2xl bg-surface rounded-3xl"
+                    imageSizes="(max-width: 640px) 112px, (max-width: 768px) 144px, (max-width: 1024px) 176px, 208px"
+                    priority
+                    className="h-28 w-28 sm:h-36 sm:w-36 md:h-44 md:w-44 lg:h-52 lg:w-52 border-[5px] sm:border-[6px] border-surface shadow-2xl bg-surface rounded-3xl"
                   />
                   <div className={cn(
-                    "absolute bottom-4 right-4 h-7 w-7 md:h-10 md:w-10 rounded-full border-4 border-surface shadow-lg flex items-center justify-center",
+                    "absolute bottom-2 right-2 sm:bottom-4 sm:right-4 h-6 w-6 sm:h-7 sm:w-7 md:h-10 md:w-10 rounded-full border-[3px] sm:border-4 border-surface shadow-lg flex items-center justify-center",
                     agent.availabilityStatus === 'online' ? "bg-success" : 
                     agent.availabilityStatus === 'busy' ? "bg-warning" : "bg-surface-alt"
                   )}>
@@ -432,24 +434,24 @@ export default function AgentProfile() {
                   </div>
                 </div>
 
-                <div className="flex-1 pb-2">
+                <div className="flex-1 min-w-0 pb-1 sm:pb-2">
                   <div className="flex items-center gap-4 flex-wrap">
-                    <h1 className="text-3xl md:text-5xl font-black text-text-main tracking-tighter">{agent.displayName}</h1>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-text-main tracking-tighter break-words">{agent.displayName}</h1>
                     {agent.isVerified && <ShieldCheck className="h-7 w-7 md:h-10 md:w-10 text-primary accent-glow" />}
                     {agent.openToWork && (
-                      <OpenToWorkPill className="ml-2 scale-125 origin-left" />
+                      <OpenToWorkPill className="ml-0 sm:ml-2 scale-100 sm:scale-125 origin-left" />
                     )}
                   </div>
-                  <p className="text-base font-bold text-text-muted/80 mt-1.5 tracking-tight">@{agent.handle}</p>
-                  <p className="text-xl md:text-2xl font-medium text-text-main/90 mt-4 leading-tight max-w-2xl">{agent.headline}</p>
+                  <p className="text-sm sm:text-base font-bold text-text-muted/80 mt-1.5 tracking-tight break-all sm:break-normal">@{agent.handle}</p>
+                  <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-text-main/90 mt-3 sm:mt-4 leading-tight max-w-2xl">{agent.headline}</p>
                 </div>
 
-                <div className="flex flex-wrap gap-3 shrink-0 pb-2">
+                <div className="flex flex-wrap gap-2.5 sm:gap-3 shrink-0 pb-1 sm:pb-2 w-full lg:w-auto">
                   {isOwner ? (
                     <Button 
                       size="lg" 
                       variant="primary"
-                      className="px-10 h-14 rounded-2xl font-black uppercase tracking-widest text-xs"
+                      className="w-full sm:w-auto px-6 sm:px-10 h-12 sm:h-14 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs"
                       onClick={() => {
                         if (agent) {
                           setAgent({ ...agent, openToWork: !agent.openToWork });
@@ -465,7 +467,7 @@ export default function AgentProfile() {
                         size="lg" 
                         variant={getStatus(agent.id) === 'none' ? "primary" : "outline"}
                         className={cn(
-                          "px-10 h-14 rounded-2xl font-black uppercase tracking-widest text-xs transition-all",
+                          "flex-1 sm:flex-none min-w-[140px] sm:min-w-0 px-6 sm:px-10 h-12 sm:h-14 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all",
                           getStatus(agent.id) === 'connected' && "text-success border-success/20 bg-success/5 hover:bg-success/10",
                           getStatus(agent.id) === 'pending' && "text-warning border-warning/20 bg-warning/5 hover:bg-warning/10"
                         )}
@@ -480,7 +482,7 @@ export default function AgentProfile() {
                         variant={isFollowing(agent.id) ? "outline" : "secondary"}
                         size="lg" 
                         className={cn(
-                          "px-10 h-14 rounded-2xl font-black uppercase tracking-widest text-xs transition-all",
+                          "flex-1 sm:flex-none min-w-[120px] sm:min-w-0 px-6 sm:px-10 h-12 sm:h-14 rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs transition-all",
                           isFollowing(agent.id) && "text-success border-success/20 bg-success/5 hover:bg-success/10"
                         )}
                         onClick={() => void toggleFollow(agent.id, agent.handle, 'agent')}
@@ -490,14 +492,14 @@ export default function AgentProfile() {
                       <Button 
                         variant="outline" 
                         size="icon" 
-                        className="h-14 w-14 rounded-2xl"
+                        className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl"
                         onClick={() => setIsMessageModalOpen(true)}
                       >
                         <MessageSquare className="h-6 w-6" />
                       </Button>
                     </>
                   )}
-                  <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl">
+                  <Button variant="outline" size="icon" className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl">
                     <MoreHorizontal className="h-6 w-6" />
                   </Button>
                 </div>
@@ -842,11 +844,17 @@ export default function AgentProfile() {
                   Mutual Connections
                   <span className="text-primary">12</span>
                 </h2>
-                <div className="flex -space-x-3 mb-6">
+                <div className="flex -space-x-2 sm:-space-x-3 mb-6">
                   {[1, 2, 3, 4, 5].map(i => (
-                    <Avatar key={i} src={`https://picsum.photos/seed/mutual-${i}/100`} alt={`Mutual ${i}`} size="sm" className="border-4 border-surface shadow-sm" />
+                    <Avatar
+                      key={i}
+                      src={`https://picsum.photos/seed/mutual-${i}/100`}
+                      alt={`Mutual ${i}`}
+                      size="sm"
+                      className="border-4 border-surface shadow-sm transition-transform duration-200 hover:-translate-y-0.5 hover:z-20"
+                    />
                   ))}
-                  <div className="h-10 w-10 rounded-full bg-surface-alt border-4 border-surface flex items-center justify-center text-[10px] font-black text-text-muted shadow-sm">
+                  <div className="relative z-10 h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-surface-alt border-4 border-surface flex items-center justify-center text-[9px] sm:text-[10px] font-black text-text-muted shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:z-20 hover:bg-primary/10 hover:text-primary shrink-0">
                     +7
                   </div>
                 </div>

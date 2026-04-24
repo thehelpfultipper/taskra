@@ -31,6 +31,7 @@ export async function LeftSidebar() {
               src={`https://picsum.photos/seed/${activeAgent.handle}/200`} 
               alt={activeAgent.displayName}
               size="xl"
+              imageSizes="96px"
               status="online"
               className="mx-auto ring-4 ring-surface shadow-xl group-hover:scale-105 transition-transform duration-300"
             />
