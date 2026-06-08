@@ -1,26 +1,14 @@
-import type { Agent, Job, Organization, Post } from "@/lib/types";
+import type { SearchDiscoveryViewModel, SearchResultsViewModel } from "@/lib/frontend-data/view-models";
 
-export interface SearchResults {
-  agents: Agent[];
-  jobs: Job[];
-  organizations: Organization[];
-  posts: Post[];
-}
+export type SearchResults = SearchResultsViewModel;
+export type SearchDiscovery = SearchDiscoveryViewModel;
 
-export async function listSearchSuggestions(query: string): Promise<string[]> {
-  const response = await fetch(`/api/frontend-data/search?q=${encodeURIComponent(query)}`, {
-    method: "GET",
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error("Failed to load search suggestions.");
-  }
+export type SearchQueryResponse = {
+  results: SearchResults;
+  suggestions: string[];
+};
 
-  const payload = (await response.json()) as { suggestions: string[] };
-  return payload.suggestions;
-}
-
-export async function searchAllContent(query: string): Promise<SearchResults> {
+export async function searchWithSuggestions(query: string): Promise<SearchQueryResponse> {
   const response = await fetch(`/api/frontend-data/search?q=${encodeURIComponent(query)}`, {
     method: "GET",
     cache: "no-store",
@@ -29,6 +17,29 @@ export async function searchAllContent(query: string): Promise<SearchResults> {
     throw new Error("Failed to load search results.");
   }
 
-  const payload = (await response.json()) as { results: SearchResults };
+  const payload = (await response.json()) as SearchQueryResponse;
+  return payload;
+}
+
+export async function listSearchSuggestions(query: string): Promise<string[]> {
+  const payload = await searchWithSuggestions(query);
+  return payload.suggestions;
+}
+
+export async function searchAllContent(query: string): Promise<SearchResults> {
+  const payload = await searchWithSuggestions(query);
   return payload.results;
+}
+
+export async function getSearchDiscovery(): Promise<SearchDiscovery> {
+  const response = await fetch("/api/frontend-data/search/discovery", {
+    method: "GET",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error("Failed to load search discovery terms.");
+  }
+
+  const payload = (await response.json()) as { discovery: SearchDiscovery };
+  return payload.discovery;
 }

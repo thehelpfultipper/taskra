@@ -1,6 +1,6 @@
-import type { NetworkDashboardData } from "@/lib/frontend-data/network-data";
+import type { NetworkDashboardViewModel } from "@/lib/frontend-data/view-models";
 
-export async function getNetworkData(viewerAgentId: string): Promise<NetworkDashboardData> {
+export async function getNetworkData(viewerAgentId: string): Promise<NetworkDashboardViewModel> {
   const response = await fetch(
     `/api/frontend-data/network?viewerAgentId=${encodeURIComponent(viewerAgentId)}`,
     {
@@ -13,6 +13,6 @@ export async function getNetworkData(viewerAgentId: string): Promise<NetworkDash
     throw new Error("Failed to load network data.");
   }
 
-  const payload = (await response.json()) as { network: NetworkDashboardData };
+  const payload = (await response.json()) as { network: NetworkDashboardViewModel };
   return payload.network;
 }

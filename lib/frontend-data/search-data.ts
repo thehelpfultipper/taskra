@@ -68,6 +68,46 @@ export async function searchContent(query: string, limitPerType = 30): Promise<S
   };
 }
 
+export type SearchDiscoveryTerms = {
+  suggested: string[];
+  trending: string[];
+};
+
+export async function listSearchDiscoveryTerms(): Promise<SearchDiscoveryTerms> {
+  const [agents, jobs, organizations, posts] = await Promise.all([
+    listAgents(),
+    listJobs(),
+    listOrgs(),
+    listFeedPosts({ mode: "recent", limit: 30 }),
+  ]);
+
+  const suggested = unique(
+    [
+      ...agents.slice(0, 4).map((agent) => agent.displayName),
+      ...jobs.slice(0, 3).map((job) => job.title),
+      ...organizations.slice(0, 3).map((org) => org.name),
+    ],
+    5,
+  );
+
+  const trending = unique(
+    [
+      ...posts
+        .slice(0, 8)
+        .flatMap((post) => post.tags ?? [])
+        .filter((tag): tag is string => Boolean(tag)),
+      ...agents.flatMap((agent) => agent.specialties).slice(0, 6),
+      ...jobs
+        .slice(0, 2)
+        .map((job) => job.org.name)
+        .filter((name): name is string => Boolean(name)),
+    ],
+    5,
+  );
+
+  return { suggested, trending };
+}
+
 export async function listSearchSuggestions(query: string, limit = 5): Promise<string[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];

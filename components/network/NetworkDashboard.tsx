@@ -65,6 +65,7 @@ export function NetworkDashboard() {
   // Suggestions state
   const [suggestions, setSuggestions] = useState<Array<{ agent: Agent; reason: string }>>([]);
   const [orgSuggestions, setOrgSuggestions] = useState<Organization[]>([]);
+  const [profileStrengthPercent, setProfileStrengthPercent] = useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -85,6 +86,7 @@ export function NetworkDashboard() {
           setConnections(network.connections);
           setSuggestions(network.suggestions);
           setOrgSuggestions(network.organizations);
+          setProfileStrengthPercent(network.profileStrengthPercent);
           setIsLoading(false);
         }
       } catch (err) {
@@ -412,12 +414,12 @@ export function NetworkDashboard() {
               <div className="pt-6 border-t border-border-base/40">
                 <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest mb-3">
                   <span className="text-text-muted/60">Profile Strength</span>
-                  <span className="text-primary">85%</span>
+                  <span className="text-primary">{profileStrengthPercent}%</span>
                 </div>
                 <div className="h-2 w-full bg-surface-alt rounded-full overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: '85%' }}
+                    animate={{ width: `${profileStrengthPercent}%` }}
                     className="h-full bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
                   />
                 </div>
@@ -438,7 +440,7 @@ export function NetworkDashboard() {
                     <div className="flex items-center gap-4">
                       <Link href={`/agents/${agent.handle}`}>
                         <Avatar 
-                          src={`https://picsum.photos/seed/${agent.handle}/200`} 
+                          src={agent.avatarUrl} 
                           alt={agent.displayName}
                           size="md"
                           className="rounded-xl border-2 border-surface shadow-sm group-hover:scale-105 transition-transform"
@@ -472,30 +474,39 @@ export function NetworkDashboard() {
             </div>
           </section>
 
-          {/* Suggested Groups/Topics (Placeholder) */}
-          <section className="space-y-4">
-            <h2 className="text-[11px] font-bold text-text-main uppercase tracking-[0.2em] px-2">
-              Suggested for you
-            </h2>
-            <Card className="space-y-4 border-dashed" padding="md">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-surface-alt flex items-center justify-center">
-                  <Users className="h-5 w-5 text-text-muted" />
+          {/* Suggested org spotlight */}
+          {orgSuggestions[0] && (
+            <section className="space-y-4">
+              <h2 className="text-[11px] font-bold text-text-main uppercase tracking-[0.2em] px-2">
+                Suggested for you
+              </h2>
+              <Card className="space-y-4 border-dashed" padding="md">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-surface-alt flex items-center justify-center overflow-hidden">
+                    <Image
+                      src={orgSuggestions[0].logoUrl}
+                      alt={orgSuggestions[0].name}
+                      width={40}
+                      height={40}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-text-main uppercase tracking-widest">{orgSuggestions[0].name}</p>
+                    <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest">{orgSuggestions[0].industry}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[11px] font-bold text-text-main uppercase tracking-widest">Neural Architects Guild</p>
-                  <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest">1.2k members</p>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="w-full text-[11px] font-bold uppercase tracking-widest h-8"
-              >
-                Join Group
-              </Button>
-            </Card>
-          </section>
+                <Button 
+                  variant={isFollowing(orgSuggestions[0].id, 'org') ? "outline" : "primary"}
+                  size="sm"
+                  className="w-full text-[11px] font-bold uppercase tracking-widest h-8"
+                  onClick={() => void toggleFollow(orgSuggestions[0].id, orgSuggestions[0].name, 'org')}
+                >
+                  {isFollowing(orgSuggestions[0].id, 'org') ? 'Following' : 'Follow Organization'}
+                </Button>
+              </Card>
+            </section>
+          )}
         </div>
       }
     />

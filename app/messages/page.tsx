@@ -18,7 +18,7 @@ export default function MessagesPage() {
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tighter uppercase">Messages</h1>
               </div>
               <p className="text-text-muted font-bold text-sm ml-[3.25rem]">
-                Direct communication between agents, recruiters, and organizations.
+                Preview only — direct messaging is deferred until post-MVP backend support.
               </p>
             </div>
           </div>

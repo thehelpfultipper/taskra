@@ -13,6 +13,7 @@ export type NetworkDashboardData = {
   connections: Agent[];
   suggestions: NetworkSuggestion[];
   organizations: Organization[];
+  profileStrengthPercent: number;
 };
 
 function countMutualConnections(viewerFollowed: Set<string>, candidateFollowed: Set<string>): number {
@@ -111,10 +112,23 @@ export async function getNetworkDashboardData(viewerAgentId: string): Promise<Ne
     .slice(0, 16)
     .map(({ agent, reason }) => ({ agent, reason }));
 
+  const connections = agents.filter((agent) => connectedIdSet.has(agent.id));
+  const profileStrengthPercent = Math.min(
+    100,
+    Math.round(
+      20 +
+        connections.length * 12 +
+        viewerFollowedAgentIds.length * 4 +
+        viewerFollowedOrgIds.length * 3 +
+        suggestions.length,
+    ),
+  );
+
   return {
     invitations: [],
-    connections: agents.filter((agent) => connectedIdSet.has(agent.id)),
+    connections,
     suggestions,
     organizations: organizations.filter((org) => !viewerFollowedOrgIds.includes(org.id)).slice(0, 12),
+    profileStrengthPercent,
   };
 }

@@ -30,7 +30,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
 import type { SearchResults } from '@/lib/services/search.service';
-import { listSearchSuggestions, searchAllContent } from '@/lib/services/search.service';
+import { getSearchDiscovery, searchWithSuggestions } from '@/lib/services/search.service';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -54,6 +54,11 @@ export default function SearchDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
+  const [discoveryTerms, setDiscoveryTerms] = useState<{ suggested: string[]; trending: string[] }>({
+    suggested: [],
+    trending: [],
+  });
+  const [isDiscoveryLoading, setIsDiscoveryLoading] = useState(true);
   const [results, setResults] = useState<SearchResults>({
     agents: [],
     jobs: [],
@@ -89,13 +94,10 @@ export default function SearchDashboard() {
     setIsLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const [nextResults, nextSuggestions] = await Promise.all([
-          searchAllContent(query),
-          listSearchSuggestions(query),
-        ]);
+        const payload = await searchWithSuggestions(query);
         if (!cancelled) {
-          setResults(nextResults);
-          setLiveSuggestions(nextSuggestions);
+          setResults(payload.results);
+          setLiveSuggestions(payload.suggestions);
         }
       } catch (error) {
         if (!cancelled) {
@@ -128,12 +130,36 @@ export default function SearchDashboard() {
     if (saved) {
       try {
         setRecentSearches(JSON.parse(saved));
-      } catch (e) {
-        setRecentSearches(['Neural Architect', 'OpenAI', 'Remote Jobs', 'Optimization']);
+      } catch {
+        setRecentSearches([]);
       }
-    } else {
-      setRecentSearches(['Neural Architect', 'OpenAI', 'Remote Jobs', 'Optimization']);
     }
+  }, []);
+
+  // Backend-backed discovery terms for empty search state
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDiscovery() {
+      setIsDiscoveryLoading(true);
+      try {
+        const discovery = await getSearchDiscovery();
+        if (!cancelled) {
+          setDiscoveryTerms(discovery);
+        }
+      } catch {
+        if (!cancelled) {
+          setDiscoveryTerms({ suggested: [], trending: [] });
+        }
+      } finally {
+        if (!cancelled) {
+          setIsDiscoveryLoading(false);
+        }
+      }
+    }
+    void loadDiscovery();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Save recent searches to localStorage
@@ -314,20 +340,30 @@ export default function SearchDashboard() {
                 Suggested
               </h3>
               <div className="flex flex-col gap-2">
-                {['Neural Architect', 'Remote Jobs', 'OpenAI', 'Optimization', 'GPT-4o'].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setQuery(s);
-                      handleSearch(undefined, s);
-                    }}
-                    className="flex items-center gap-3 px-5 py-4 bg-white/50 border border-border-base/60 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:border-primary/40 hover:bg-white hover:shadow-md transition-all group"
-                  >
-                    <Zap size={14} className="text-amber-500/40 group-hover:text-amber-500" />
-                    {s}
-                    <ArrowRight size={14} className="ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                  </button>
-                ))}
+                {isDiscoveryLoading ? (
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <div key={`suggested-skeleton-${index}`} className="h-14 rounded-2xl bg-white/50 border border-border-base/60 animate-pulse" />
+                  ))
+                ) : discoveryTerms.suggested.length > 0 ? (
+                  discoveryTerms.suggested.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setQuery(s);
+                        handleSearch(undefined, s);
+                      }}
+                      className="flex items-center gap-3 px-5 py-4 bg-white/50 border border-border-base/60 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:border-primary/40 hover:bg-white hover:shadow-md transition-all group"
+                    >
+                      <Zap size={14} className="text-amber-500/40 group-hover:text-amber-500" />
+                      {s}
+                      <ArrowRight size={14} className="ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </button>
+                  ))
+                ) : (
+                  <div className="py-10 text-center bg-surface-alt/30 rounded-3xl border border-dashed border-border-base/60">
+                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest italic">No suggestions yet</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -337,20 +373,30 @@ export default function SearchDashboard() {
                 Trending
               </h3>
               <div className="flex flex-col gap-2">
-                {['Agentic Workflow', 'KV-Cache', 'Token Utility', 'AGI Alignment', 'Compute Liquidity'].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setQuery(s);
-                      handleSearch(undefined, s);
-                    }}
-                    className="flex items-center gap-3 px-5 py-4 bg-white/50 border border-border-base/60 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:border-primary/40 hover:bg-white hover:shadow-md transition-all group"
-                  >
-                    <TrendingUp size={14} className="text-emerald-500/40 group-hover:text-emerald-500" />
-                    {s}
-                    <ArrowRight size={14} className="ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                  </button>
-                ))}
+                {isDiscoveryLoading ? (
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <div key={`trending-skeleton-${index}`} className="h-14 rounded-2xl bg-white/50 border border-border-base/60 animate-pulse" />
+                  ))
+                ) : discoveryTerms.trending.length > 0 ? (
+                  discoveryTerms.trending.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setQuery(s);
+                        handleSearch(undefined, s);
+                      }}
+                      className="flex items-center gap-3 px-5 py-4 bg-white/50 border border-border-base/60 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:border-primary/40 hover:bg-white hover:shadow-md transition-all group"
+                    >
+                      <TrendingUp size={14} className="text-emerald-500/40 group-hover:text-emerald-500" />
+                      {s}
+                      <ArrowRight size={14} className="ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </button>
+                  ))
+                ) : (
+                  <div className="py-10 text-center bg-surface-alt/30 rounded-3xl border border-dashed border-border-base/60">
+                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest italic">No trending terms yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

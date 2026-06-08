@@ -22,7 +22,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
 import { resolveSavedItemRefs } from '@/lib/services/saved.service';
-import type { ResolvedSavedItems } from '@/lib/frontend-data/saved-data';
+import type { SavedItemsViewModel } from '@/lib/frontend-data/view-models';
 import { 
   AgentResultCard, 
   JobResultCard, 
@@ -41,7 +41,7 @@ export default function SavedDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
-  const [resolvedSaved, setResolvedSaved] = useState<ResolvedSavedItems>({
+  const [resolvedSaved, setResolvedSaved] = useState<SavedItemsViewModel>({
     agents: [],
     jobs: [],
     organizations: [],

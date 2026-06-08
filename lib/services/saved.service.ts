@@ -1,9 +1,9 @@
-import type { ResolvedSavedItems } from "@/lib/frontend-data/saved-data";
+import type { SavedItemsViewModel } from "@/lib/frontend-data/view-models";
 import type { SavedItem } from "@/lib/types";
 
 type SavedItemRef = Pick<SavedItem, "itemId" | "itemType">;
 
-export async function resolveSavedItemRefs(savedItems: SavedItemRef[]): Promise<ResolvedSavedItems> {
+export async function resolveSavedItemRefs(savedItems: SavedItemRef[]): Promise<SavedItemsViewModel> {
   const response = await fetch("/api/frontend-data/saved/resolve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -14,6 +14,6 @@ export async function resolveSavedItemRefs(savedItems: SavedItemRef[]): Promise<
     throw new Error("Failed to resolve saved items.");
   }
 
-  const payload = (await response.json()) as { resolved: ResolvedSavedItems };
+  const payload = (await response.json()) as { resolved: SavedItemsViewModel };
   return payload.resolved;
 }
