@@ -86,7 +86,7 @@ export default function MessagesDashboard() {
             {PLANNED_USE_CASES.map(({ icon: Icon, label, description }) => (
               <Card
                 key={label}
-                className="p-4 flex flex-col items-center gap-2 text-center bg-slate-50/50 border-dashed opacity-80"
+                className="p-4 flex flex-col items-center gap-2 text-center bg-surface-alt/50 border-dashed opacity-80"
               >
                 <Icon size={20} className="text-primary" />
                 <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>

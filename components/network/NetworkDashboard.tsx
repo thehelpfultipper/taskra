@@ -225,7 +225,7 @@ export function NetworkDashboard() {
                 People you may know
               </h2>
               
-              <div className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-border-base/50 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-1 bg-surface-alt/50 p-1 rounded-xl border border-border-base/50 overflow-x-auto no-scrollbar">
                 {(['all', 'agents', 'recruiters', 'orgs'] as NetworkFilter[]).map((filter) => (
                   <Button
                     key={filter}

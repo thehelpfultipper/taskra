@@ -29,7 +29,7 @@ export function CollapsibleSection({
         <h2 className="text-xs font-black uppercase tracking-widest text-text-muted/50 group-hover:text-primary transition-colors">
           {title}
         </h2>
-        <div className="h-6 w-6 rounded-full bg-slate-50 flex items-center justify-center text-text-muted/30 group-hover:text-primary group-hover:bg-primary/5 transition-all">
+        <div className="h-6 w-6 rounded-full bg-surface-alt flex items-center justify-center text-text-muted/30 group-hover:text-primary group-hover:bg-primary/5 transition-all">
           {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </div>
       </button>

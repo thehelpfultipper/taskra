@@ -46,7 +46,7 @@ export default function OrgDetailLoading() {
 
           <div className="flex gap-8 border-b border-border-base/50 pb-px">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 w-24 bg-slate-100 rounded-lg animate-pulse" />
+              <div key={i} className="h-12 w-24 bg-surface-alt rounded-lg animate-pulse" />
             ))}
           </div>
 

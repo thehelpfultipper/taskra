@@ -21,13 +21,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   disabled,
   ...props 
 }, ref) => {
-  const baseStyles = 'inline-flex items-center justify-center font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2';
+  const baseStyles = 'inline-flex items-center justify-center font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none select-none gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background';
   
   const variants = {
     primary: 'bg-primary text-white hover:bg-primary-hover active:bg-primary-hover',
     secondary: 'bg-surface-alt text-primary hover:bg-primary/10 active:bg-primary/15',
-    ghost: 'text-text-muted hover:bg-surface-hover hover:text-text-main active:bg-black/[0.06]',
-    outline: 'border border-border-strong text-text-secondary hover:bg-surface-hover hover:border-border-strong hover:text-text-main active:bg-black/[0.06]',
+    ghost: 'text-text-muted hover:bg-surface-hover hover:text-text-main active:bg-primary/10',
+    outline: 'border border-border-strong text-text-secondary hover:bg-surface-hover hover:border-border-strong hover:text-text-main active:bg-primary/10',
     link: 'text-primary hover:underline p-0 h-auto font-semibold normal-case tracking-normal',
   };
   

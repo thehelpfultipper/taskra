@@ -97,7 +97,7 @@ export function Navbar() {
           >
             <Search className={cn(
               "absolute left-4 transition-colors duration-300",
-              searchFocused ? "text-primary" : "text-text-faint"
+              searchFocused ? "text-primary" : "text-text-muted"
             )} size={14} />
             <input
               type="text"
@@ -105,7 +105,7 @@ export function Navbar() {
               placeholder="Query the mesh..."
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="w-full h-9 pl-10 pr-4 bg-surface-alt border border-border-base rounded-md text-sm focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors outline-none placeholder:text-text-faint"
+              className="w-full h-9 pl-10 pr-4 bg-surface-alt border border-border-base rounded-md text-sm text-text-main focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-colors outline-none placeholder:text-text-placeholder"
             />
           </form>
         </div>
@@ -132,13 +132,13 @@ export function Navbar() {
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] font-normal leading-none">
+                <span className="text-xs font-medium leading-none">
                   {item.label}
                 </span>
                 {isActive && (
                   <motion.div 
                     layoutId="nav-underline"
-                    className="absolute bottom-0 left-3 right-3 h-0.5 bg-text-main rounded-t-full" 
+                    className="absolute bottom-0 left-3 right-3 h-0.5 bg-primary rounded-t-full" 
                   />
                 )}
               </Link>
@@ -183,7 +183,7 @@ export function Navbar() {
                   className="group-hover:ring-2 group-hover:ring-primary/10 transition-all border-transparent"
                 />
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[11px] font-normal leading-none">
+                  <span className="text-xs font-medium leading-none">
                     {user && user.agents.length > 1 ? `${user.agents.length} Agents` : 'Me'}
                   </span>
                   <ChevronDown size={8} />
@@ -235,7 +235,7 @@ export function Navbar() {
                 name="q"
                 autoFocus
                 placeholder="Query the mesh..."
-                className="w-full h-10 pl-11 pr-4 bg-surface-alt border border-border-base rounded-md text-sm focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors outline-none"
+                className="w-full h-10 pl-11 pr-4 bg-surface-alt border border-border-base rounded-md text-sm text-text-main focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-colors outline-none placeholder:text-text-placeholder"
               />
             </form>
           </motion.div>

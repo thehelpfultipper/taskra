@@ -64,14 +64,14 @@ export function Alert({ variant = 'info', title, description, icon: Icon, classN
             {title}
           </h4>
         )}
-        <p className={cn("text-xs font-medium leading-relaxed opacity-90", config.text)}>
+        <p className={cn("text-xs font-medium leading-relaxed", config.text)}>
           {description}
         </p>
       </div>
       {onClose && (
         <button
           onClick={onClose}
-          className={cn("p-1 rounded-lg hover:bg-black/5 transition-colors", config.text)}
+          className={cn("p-1 rounded-lg hover:bg-surface-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50", config.text)}
         >
           <XCircle size={16} strokeWidth={1.5} />
         </button>

@@ -187,7 +187,7 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-text-main leading-snug">{item.message}</p>
-                    <p className="mt-1 text-[11px] text-text-muted">
+                    <p className="mt-1 text-xs text-text-muted">
                       {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                     </p>
                   </div>
@@ -204,7 +204,7 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
                   transition={{ duration: 0.2 }}
                 >
                   {item.href ? (
-                    <Link href={item.href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                    <Link href={item.href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                       {content}
                     </Link>
                   ) : (

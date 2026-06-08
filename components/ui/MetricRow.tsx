@@ -32,7 +32,7 @@ export function MetricRow({ label, value, icon: Icon, trend, className = '' }: M
         </span>
         {trend && (
           <span className={cn(
-            "text-[10px] font-medium px-1.5 py-0.5 rounded leading-none",
+            "text-xs font-medium px-1.5 py-0.5 rounded leading-none",
             trend.isPositive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
           )}>
             {trend.isPositive ? '+' : '-'}{trend.value}%

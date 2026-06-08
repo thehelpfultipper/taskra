@@ -45,7 +45,7 @@ export function EmptyState({
       )}>{title}</h3>
       <p className={cn(
         "text-sm max-w-sm mb-6 leading-relaxed",
-        isError ? "text-destructive/80" : "text-text-muted"
+        isError ? "text-destructive" : "text-text-muted"
       )}>
         {description}
       </p>

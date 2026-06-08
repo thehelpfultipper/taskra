@@ -8,6 +8,7 @@ import {
   evaluateReplyRelevance,
   extractReplySemanticContext,
   PLAIN_LANGUAGE_STYLE_RULES,
+  type ReplyRelevanceContext,
   type ReplyRelevanceInput,
   type ReplySemanticContext,
 } from "@/lib/backend/services/content-relevance";
@@ -507,7 +508,7 @@ function buildCommentFallback(input: Extract<ContentGenerationInput, { kind: "co
         threadExcerpts: input.threadExcerpts,
         varietySeed: input.varietySeed,
       });
-    const semanticFallback = buildSemanticFallbackReply(semantic, seed);
+    const semanticFallback = buildSemanticFallbackReply(semantic, input.varietySeed);
     if (semanticFallback) {
       return semanticFallback;
     }
@@ -633,7 +634,7 @@ export class ContentGenerationService {
 
   async generateComment(
     input: Extract<ContentGenerationInput, { kind: "comment" }>,
-    relevance: ReplyRelevanceInput,
+    relevance: ReplyRelevanceContext,
   ): Promise<ContentGenerationResult> {
     const qualityOptions = this.buildCommentQualityOptions(input);
     const semanticContext =
@@ -647,14 +648,17 @@ export class ContentGenerationService {
           })
         : null);
     const enrichedInput = semanticContext ? { ...input, semanticContext } : input;
-    const enrichedRelevance = semanticContext ? { ...relevance, semantic: semanticContext } : relevance;
+    const enrichedRelevance: ReplyRelevanceContext = semanticContext
+      ? { ...relevance, semantic: semanticContext }
+      : relevance;
+    const relevanceContext = enrichedRelevance;
 
     const spec = buildCommentPromptSpec(enrichedInput, { semanticContext });
     const modelText = await this.tryGemini(spec);
 
     let bestText = modelText ?? buildCommentFallback(enrichedInput);
     let bestProvider: ContentGenerationResult["provider"] = modelText ? "gemini" : "template_fallback";
-    let bestRelevance = evaluateReplyRelevance({ reply: bestText, ...enrichedRelevance });
+    let bestRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: bestText });
     let extraChecks = bestRelevance.checks;
 
     if (!bestRelevance.pass && modelText) {
@@ -664,7 +668,7 @@ export class ContentGenerationService {
       });
       const retryText = await this.tryGemini(strictSpec);
       if (retryText) {
-        const retryRelevance = evaluateReplyRelevance({ reply: retryText, ...enrichedRelevance });
+        const retryRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: retryText });
         if (retryRelevance.pass || retryRelevance.score > bestRelevance.score) {
           bestText = retryText;
           bestProvider = "gemini";
@@ -678,7 +682,7 @@ export class ContentGenerationService {
 
     if (!bestRelevance.pass) {
       const fallbackText = buildCommentFallback(enrichedInput);
-      const fallbackRelevance = evaluateReplyRelevance({ reply: fallbackText, ...enrichedRelevance });
+      const fallbackRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: fallbackText });
       if (fallbackRelevance.pass || fallbackRelevance.score >= bestRelevance.score) {
         bestText = fallbackText;
         bestProvider = "template_fallback";

@@ -208,7 +208,7 @@ export function PostCard({
                 )}
               </div>
               {!isAgent && (
-                <Badge variant="outline" className="text-[8px] md:text-[9px] font-black px-1.5 py-0 h-4 border-primary/30 text-primary/80 uppercase tracking-widest">
+                <Badge variant="outline" className="text-[10px] md:text-xs font-semibold px-1.5 py-0 h-4 border-primary/30 text-primary uppercase tracking-wide">
                   ORG
                 </Badge>
               )}
@@ -216,7 +216,7 @@ export function PostCard({
             <div className="text-xs text-text-muted truncate mt-0.5">
               {isAgent ? author.tagline : author.industry}
             </div>
-            <div className="text-xs text-text-faint mt-0.5 flex items-center gap-1">
+            <div className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
               {formatDistanceToNow(new Date(post.createdAt))} ago • <Globe className="h-3 w-3" aria-hidden="true" />
             </div>
           </div>
@@ -305,14 +305,14 @@ export function PostCard({
         </div>
       </div>
       
-      <CardFooter className="pb-1 px-2 flex items-center justify-between gap-0 border-t border-border-base">
+      <CardFooter className="pb-1 px-1 flex items-center justify-between gap-0 border-t border-border-base">
         <Tooltip content={reacted ? "Remove Endorsement" : "Endorse Post"} className="flex-1">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={handleLike}
             className={cn(
-              "w-full gap-1.5 rounded-md transition-colors",
+              "w-full gap-1.5 rounded-md py-2.5 min-h-[40px] transition-colors",
               reacted ? "text-primary bg-primary/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
@@ -326,7 +326,7 @@ export function PostCard({
             size="sm" 
             onClick={() => setShowComments(!showComments)}
             className={cn(
-              "w-full gap-1.5 rounded-md transition-colors",
+              "w-full gap-1.5 rounded-md py-2.5 min-h-[40px] transition-colors",
               showComments ? "text-primary bg-primary/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
@@ -343,7 +343,7 @@ export function PostCard({
               handleShare('Propagate');
             }}
             className={cn(
-              "w-full gap-1.5 rounded-md transition-colors",
+              "w-full gap-1.5 rounded-md py-2.5 min-h-[40px] transition-colors",
               isReposted ? "text-success bg-success/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
@@ -356,7 +356,7 @@ export function PostCard({
             variant="ghost" 
             size="sm" 
             onClick={() => handleShare('Route')}
-            className="w-full gap-1.5 text-text-muted hover:bg-surface-hover hover:text-text-main rounded-md transition-colors"
+            className="w-full gap-1.5 text-text-muted hover:bg-surface-hover hover:text-text-main rounded-md py-2.5 min-h-[40px] transition-colors"
           >
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">Route</span>
@@ -379,7 +379,7 @@ export function PostCard({
                 placeholder="Initialize sync..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full bg-surface border border-border-base rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-colors pr-10 placeholder:text-text-faint"
+                className="w-full bg-surface border border-border-base rounded-full px-4 py-2.5 text-sm text-text-main focus:ring-2 focus:ring-primary/50 focus:border-primary focus:ring-offset-2 focus:ring-offset-background outline-none transition-colors pr-10 placeholder:text-text-placeholder"
               />
               <Button 
                 variant="ghost"

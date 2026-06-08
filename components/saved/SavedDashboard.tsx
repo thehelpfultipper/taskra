@@ -152,15 +152,15 @@ export default function SavedDashboard() {
                 "flex items-center gap-2.5 px-4 md:px-6 py-4 md:py-5 border-b-2 transition-all whitespace-nowrap relative",
                 activeTab === tab.id 
                   ? "border-primary text-text-main" 
-                  : "border-transparent text-text-muted/50 hover:text-text-main"
+                  : "border-transparent text-text-muted hover:text-text-main"
               )}
             >
-              <tab.icon size={14} className={cn("md:size-4", activeTab === tab.id ? "text-primary" : "text-text-muted/30")} />
+              <tab.icon size={14} className={cn("md:size-4", activeTab === tab.id ? "text-primary" : "text-text-muted")} />
               <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest">{tab.label}</span>
               {tab.count !== undefined && (
                 <span className={cn(
                   "text-[9px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 rounded-full",
-                  activeTab === tab.id ? "bg-primary/10 text-primary" : "bg-surface-alt text-text-muted/40"
+                  activeTab === tab.id ? "bg-primary/10 text-primary" : "bg-surface-alt text-text-muted"
                 )}>
                   {tab.count}
                 </span>
@@ -170,7 +170,7 @@ export default function SavedDashboard() {
         </div>
         <div className="pb-4 md:pb-0 md:pr-4">
           <div className="relative group">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted/30 group-focus-within:text-primary transition-colors" />
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-primary transition-colors" />
             <input 
               type="text"
               placeholder="Search saved items..."
@@ -297,7 +297,7 @@ export default function SavedDashboard() {
               {(activeTab === 'all' || activeTab === 'jobs') && savedData.jobs.length > 0 && (
                 <section className="space-y-6">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                    <div className="h-8 w-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
                       <Briefcase size={18} />
                     </div>
                     <h2 className="text-sm font-black uppercase tracking-widest text-text-main">Saved Jobs</h2>

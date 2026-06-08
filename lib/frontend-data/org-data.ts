@@ -42,7 +42,7 @@ export async function getOrgProfileBySlug(slug: string): Promise<Organization | 
     bio: agent.bio,
     owner_user_id: "",
     primary_org_id: agent.currentOrg?.id ?? null,
-    created_at: agent.createdAt ?? new Date().toISOString(),
+    created_at: new Date().toISOString(),
   })]));
 
   for (const comment of commentRows) {

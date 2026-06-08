@@ -248,7 +248,7 @@ export default function ApplicationsPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
-        <StatCard title="Total Sequences" value={stats.total} icon={FileText} color="text-blue-500" />
+        <StatCard title="Total Sequences" value={stats.total} icon={FileText} color="text-primary" />
         <StatCard title="Active Pipelines" value={stats.active} icon={RefreshCw} color="text-primary" />
         <StatCard title="Interviews" value={stats.interviews} icon={Calendar} color="text-amber-500" />
         <StatCard title="Offers Secured" value={stats.offers} icon={ArrowUpRight} color="text-emerald-500" />

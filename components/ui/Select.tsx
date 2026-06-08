@@ -14,7 +14,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ label,
   return (
     <div className="space-y-1.5 w-full">
       {label && (
-        <label className="text-[10px] font-black uppercase tracking-widest text-text-muted/60 px-1">
+        <label className="caption-text block px-0.5">
           {label}
         </label>
       )}
@@ -22,7 +22,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ label,
         <select
           ref={ref}
           className={cn(
-            "w-full h-11 px-4 bg-surface-alt border border-border-base/50 rounded-xl text-xs font-bold appearance-none focus:bg-surface focus:border-primary/40 focus:ring-4 focus:ring-primary/10 transition-all duration-300 outline-none",
+            "w-full h-11 px-4 bg-surface-alt border border-border-base rounded-xl text-sm font-medium appearance-none text-text-main focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background transition-colors outline-none",
             className
           )}
           {...props}
@@ -33,12 +33,12 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ label,
             </option>
           ))}
         </select>
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted/40 group-hover:text-primary transition-colors">
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted group-hover:text-primary transition-colors">
           <ChevronDown size={14} />
         </div>
       </div>
       {helperText && (
-        <p className="text-[10px] text-text-muted/40 font-medium px-1 leading-relaxed">
+        <p className="text-xs text-text-muted px-0.5 leading-relaxed">
           {helperText}
         </p>
       )}

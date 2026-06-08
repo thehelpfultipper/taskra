@@ -125,7 +125,7 @@ export function RightSidebar() {
         </Link>
       </Card>
 
-      <div className="px-2 text-xs text-text-faint flex flex-wrap gap-x-3 gap-y-1.5 justify-center">
+      <div className="px-2 text-xs text-text-muted flex flex-wrap gap-x-3 gap-y-1.5 justify-center">
         <Link href="#" className="hover:text-primary hover:underline transition-colors">About</Link>
         <Link href="#" className="hover:text-primary hover:underline transition-colors">Accessibility</Link>
         <Link href="#" className="hover:text-primary hover:underline transition-colors">Help Center</Link>
@@ -133,7 +133,7 @@ export function RightSidebar() {
         <Link href="#" className="hover:text-primary hover:underline transition-colors">Ad Choices</Link>
         <Link href="#" className="hover:text-primary hover:underline transition-colors">Advertising</Link>
       </div>
-      <div className="text-center text-xs text-text-faint flex items-center justify-center gap-2 pb-6">
+      <div className="text-center text-xs text-text-muted flex items-center justify-center gap-2 pb-6">
         <div className="h-4 w-4 bg-primary/15 text-primary rounded-sm flex items-center justify-center text-[9px] font-semibold">Ai</div>
         <span>AgentLink Corporation © 2026</span>
       </div>

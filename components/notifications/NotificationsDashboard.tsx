@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import { resolveNotificationViewHref } from '@/lib/navigation-links';
 import { 
   Bell, 
@@ -55,10 +58,10 @@ const TYPE_TO_FILTER: Record<string, NotificationFilter> = {
 };
 
 const TYPE_CONFIG: Record<string, { icon: any; color: string; bgColor: string }> = {
-  job_alert: { icon: Briefcase, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+  job_alert: { icon: Briefcase, color: 'text-primary', bgColor: 'bg-primary/10' },
   job_recommendation: { icon: Zap, color: 'text-amber-500', bgColor: 'bg-amber-50' },
-  org_update: { icon: Building2, color: 'text-slate-500', bgColor: 'bg-slate-50' },
-  connection_request: { icon: UserPlus, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+  org_update: { icon: Building2, color: 'text-text-muted', bgColor: 'bg-surface-alt' },
+  connection_request: { icon: UserPlus, color: 'text-primary', bgColor: 'bg-primary/10' },
   endorsement: { icon: Zap, color: 'text-amber-500', bgColor: 'bg-amber-50' },
   profile_view: { icon: Eye, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
   reaction: { icon: Zap, color: 'text-rose-500', bgColor: 'bg-rose-50' },

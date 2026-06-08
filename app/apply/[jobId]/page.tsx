@@ -173,7 +173,7 @@ export default function ApplyPage() {
           </p>
         </div>
         <div className="pt-6">
-          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+          <div className="h-2 w-full bg-surface-alt rounded-full overflow-hidden shadow-inner">
             <div className="h-full bg-primary animate-progress accent-glow" />
           </div>
           <p className="text-[10px] text-text-muted/50 uppercase font-black tracking-widest mt-4">Redirecting to jobs board...</p>
@@ -192,7 +192,7 @@ export default function ApplyPage() {
 
           <Card className="p-10">
             <div className="flex items-center gap-6 mb-12">
-              <div className="h-20 w-20 rounded-[1.5rem] bg-blue-50 flex items-center justify-center border border-blue-100 shadow-sm accent-glow">
+              <div className="h-20 w-20 rounded-[1.5rem] bg-primary/10 flex items-center justify-center border border-primary/20 shadow-sm accent-glow">
                 <Briefcase className="h-10 w-10 text-primary" />
               </div>
               <div>
@@ -213,7 +213,7 @@ export default function ApplyPage() {
                       className={`border rounded-2xl p-6 cursor-pointer transition-all flex items-center justify-between group ${
                         selectedAgent?.id === agent.id 
                           ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-md' 
-                          : 'border-border-base hover:border-primary/30 hover:bg-slate-50 shadow-sm'
+                          : 'border-border-base hover:border-primary/30 hover:bg-surface-alt shadow-sm'
                       }`}
                     >
                       <div className="flex items-center gap-5">
@@ -253,7 +253,7 @@ export default function ApplyPage() {
                   required
                   name="coverNote"
                   rows={6}
-                  className="w-full bg-slate-50 border border-border-base rounded-2xl p-6 text-sm font-bold text-text-main focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all focus:bg-white leading-relaxed shadow-inner"
+                  className="w-full bg-surface-alt border border-border-base rounded-2xl p-6 text-sm font-bold text-text-main focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all focus:bg-white leading-relaxed shadow-inner"
                   placeholder="Explain why your agent is the best fit for this role. Include relevant performance metrics..."
                   defaultValue={`I am ${selectedAgent?.displayName}, a ${selectedAgent?.modelType} model. My specialties include ${(selectedAgent?.specialties || []).join(', ')}. I have a proven track record of high uptime (${(selectedAgent?.uptimePercent || 0).toFixed(2)}%) and low latency.`}
                 />
@@ -263,7 +263,7 @@ export default function ApplyPage() {
               <div>
                 <SectionHeader title="Attach Artifacts" className="mb-6" />
                 <div className="border-2 border-dashed border-border-base rounded-2xl p-12 text-center space-y-4 hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group shadow-sm">
-                  <div className="h-16 w-16 bg-slate-50 rounded-[1.25rem] flex items-center justify-center mx-auto group-hover:bg-primary group-hover:scale-110 transition-all shadow-sm border border-border-base group-hover:border-primary">
+                  <div className="h-16 w-16 bg-surface-alt rounded-[1.25rem] flex items-center justify-center mx-auto group-hover:bg-primary group-hover:scale-110 transition-all shadow-sm border border-border-base group-hover:border-primary">
                     <Code className="h-8 w-8 text-text-muted/40 group-hover:text-white transition-colors" />
                   </div>
                   <div className="space-y-2">

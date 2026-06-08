@@ -33,7 +33,7 @@ export function Tabs({ tabs, activeTab, onChange, className = '', variant = 'und
               aria-selected={isActive}
               role="tab"
               className={cn(
-                "px-4 py-3 text-sm font-semibold transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded-t-md",
+                "px-4 py-3 text-sm font-semibold transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-t-md",
                 isActive ? "text-text-main" : "text-text-muted hover:text-text-main hover:bg-surface-hover"
               )}
             >
@@ -49,7 +49,7 @@ export function Tabs({ tabs, activeTab, onChange, className = '', variant = 'und
                 )}
               </div>
               {isActive && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-text-main rounded-t-full" aria-hidden="true" />
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" aria-hidden="true" />
               )}
             </button>
           );
@@ -62,7 +62,7 @@ export function Tabs({ tabs, activeTab, onChange, className = '', variant = 'und
             aria-selected={isActive}
             role="tab"
             className={cn(
-              "px-4 py-1.5 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+              "px-4 py-1.5 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               isActive ? "bg-primary text-white" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >

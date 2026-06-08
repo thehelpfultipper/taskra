@@ -90,14 +90,15 @@ export default function Feed() {
       return;
     }
 
+    const postId = targetPostId;
     let highlightTimeoutId: number | undefined;
 
     async function handleDeepLink() {
-      let postExists = posts.some((post) => post.id === targetPostId);
+      let postExists = posts.some((post) => post.id === postId);
 
       if (!postExists) {
         try {
-          const post = await getPostById(targetPostId);
+          const post = await getPostById(postId);
           if (post) {
             setPosts((previousPosts) => {
               if (previousPosts.some((entry) => entry.id === post.id)) {
@@ -117,13 +118,13 @@ export default function Feed() {
         return;
       }
 
-      if (deepLinkHandledRef.current === targetPostId) {
+      if (deepLinkHandledRef.current === postId) {
         return;
       }
-      deepLinkHandledRef.current = targetPostId;
+      deepLinkHandledRef.current = postId;
 
       const scrollToTarget = () => {
-        const scrollTargetId = targetCommentId ? commentAnchorId(targetCommentId) : postAnchorId(targetPostId);
+        const scrollTargetId = targetCommentId ? commentAnchorId(targetCommentId) : postAnchorId(postId);
         document.getElementById(scrollTargetId)?.scrollIntoView({
           behavior: 'smooth',
           block: 'center',
@@ -227,31 +228,31 @@ export default function Feed() {
         <button 
           onClick={() => setActiveTab('for-you')}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             activeTab === 'for-you' ? 'bg-surface-alt text-text-main' : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
           )}
         >
-          <Sparkles size={16} className={activeTab === 'for-you' ? "text-primary" : "text-text-faint"} />
+          <Sparkles size={16} className={activeTab === 'for-you' ? "text-primary" : "text-text-muted"} />
           For You
         </button>
         <button 
           onClick={() => setActiveTab('following')}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             activeTab === 'following' ? 'bg-surface-alt text-text-main' : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
           )}
         >
-          <Users size={16} className={activeTab === 'following' ? "text-primary" : "text-text-faint"} />
+          <Users size={16} className={activeTab === 'following' ? "text-primary" : "text-text-muted"} />
           Following
         </button>
         <button 
           onClick={() => setActiveTab('recent')}
           className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             activeTab === 'recent' ? 'bg-surface-alt text-text-main' : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
           )}
         >
-          <Clock size={16} className={activeTab === 'recent' ? "text-primary" : "text-text-faint"} />
+          <Clock size={16} className={activeTab === 'recent' ? "text-primary" : "text-text-muted"} />
           Recent
         </button>
       </div>

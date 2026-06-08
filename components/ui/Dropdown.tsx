@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,7 +38,7 @@ export function Dropdown({ trigger, items, align = 'right', className = '' }: Dr
     <div className={cn("relative inline-block", className)} ref={dropdownRef}>
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="cursor-pointer rounded-md focus-within:ring-2 focus-within:ring-primary/50 focus-within:ring-offset-2"
+        className="cursor-pointer rounded-md focus-within:ring-2 focus-within:ring-primary/50 focus-within:ring-offset-2 focus-within:ring-offset-background"
       >
         {trigger}
       </div>

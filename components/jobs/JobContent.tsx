@@ -72,8 +72,8 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           {/* Header Card */}
-          <Card className="overflow-hidden border-none shadow-xl shadow-slate-200/50">
-            <div className="h-32 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative">
+          <Card className="overflow-hidden border-none shadow-xl shadow-border-base/50">
+            <div className="h-32 bg-gradient-to-r from-ink via-primary-hover to-ink relative">
               <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
             </div>
@@ -81,7 +81,7 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
               <div className="flex flex-col md:flex-row gap-6 items-end justify-between">
                 <div className="flex gap-6 items-end">
                   <div className="h-24 w-24 rounded-3xl bg-white p-1 shadow-2xl ring-4 ring-white">
-                    <div className="h-full w-full bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 relative overflow-hidden">
+                    <div className="h-full w-full bg-surface-alt rounded-2xl flex items-center justify-center border border-border-base relative overflow-hidden">
                       {org.logoUrl && org.logoUrl !== '#' ? (
                         <Image src={org.logoUrl} alt={org.name} fill className="object-cover" referrerPolicy="no-referrer" />
                       ) : (
@@ -149,7 +149,7 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
               <CollapsibleSection title="Preferred Tools" className="space-y-6">
                 <div className="flex flex-wrap gap-2">
                   {(job.preferredTools || ['Neural-Net-v2', 'Compute-Orchestrator', 'Safety-Guard']).map((tool, i) => (
-                    <Badge key={i} variant="secondary" className="bg-slate-100 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 border-slate-200">
+                    <Badge key={i} variant="secondary" className="bg-surface-alt text-[10px] font-black uppercase tracking-widest px-3 py-1.5 border-border-base">
                       {tool}
                     </Badge>
                   ))}
@@ -162,7 +162,7 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
             <CollapsibleSection title="Artifact Expectations">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(job.artifactExpectations || ['System Architecture Diagram', 'Performance Benchmarks']).map((artifact, i) => (
-                  <div key={i} className="p-4 rounded-xl border border-border-base bg-slate-50/50 flex items-center gap-4 group hover:border-primary/30 transition-all">
+                  <div key={i} className="p-4 rounded-xl border border-border-base bg-surface-alt/50 flex items-center gap-4 group hover:border-primary/30 transition-all">
                     <div className="h-10 w-10 rounded-lg bg-white border border-border-base flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                       <FileCode className="h-5 w-5" />
                     </div>
@@ -201,14 +201,14 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
                     </Button>
                   </Link>
                 </div>
-                <div className="w-full md:w-64 h-40 rounded-2xl bg-slate-100 relative overflow-hidden group">
+                <div className="w-full md:w-64 h-40 rounded-2xl bg-surface-alt relative overflow-hidden group">
                   <Image 
                     src={`https://picsum.photos/seed/${org.slug}/600/400`} 
                     alt={org.name} 
                     fill 
                     className="object-cover group-hover:scale-105 transition-transform duration-500" 
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
                   <div className="absolute bottom-4 left-4 right-4">
                     <p className="text-[10px] font-black text-white uppercase tracking-widest">Headquarters</p>
                     <p className="text-xs font-bold text-white/80">San Francisco, CA</p>
@@ -225,7 +225,7 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
               {similarJobs.map(sj => (
                 <Link key={sj.id} href={`/jobs/${sj.id}`}>
                   <Card className="p-5 h-full hover:border-primary/30 transition-all group" hover>
-                    <div className="h-10 w-10 rounded-lg bg-slate-50 border border-border-base flex items-center justify-center mb-4 overflow-hidden">
+                    <div className="h-10 w-10 rounded-lg bg-surface-alt border border-border-base flex items-center justify-center mb-4 overflow-hidden">
                       {sj.org.logoUrl ? (
                         <Image src={sj.org.logoUrl} alt={sj.org.name || ''} width={40} height={40} className="object-cover" />
                       ) : (
@@ -262,12 +262,12 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
             </div>
 
             <div className="space-y-6">
-              <div className="p-4 rounded-xl bg-slate-50 border border-border-base">
+              <div className="p-4 rounded-xl bg-surface-alt border border-border-base">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[10px] font-black text-text-muted/50 uppercase tracking-widest">Agent Compatibility</span>
                   <span className="text-xs font-black text-primary">{fitScore}%</span>
                 </div>
-                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-border-base h-1.5 rounded-full overflow-hidden">
                   <div className="bg-primary h-full rounded-full" style={{ width: `${fitScore}%` }} />
                 </div>
                 <p className="text-[9px] font-bold text-text-muted/60 mt-3 leading-relaxed uppercase tracking-wider">
@@ -317,7 +317,7 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
           {/* Screening Info */}
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="h-8 w-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+              <div className="h-8 w-8 rounded-lg bg-ink flex items-center justify-center text-white">
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <h3 className="text-[10px] font-black uppercase tracking-widest text-text-main">Screening Protocol</h3>

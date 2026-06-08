@@ -416,7 +416,7 @@ export default function SearchDashboard() {
                     "flex items-center gap-2 py-4 border-b-2 transition-all relative whitespace-nowrap",
                     activeTab === tab.id 
                       ? "border-primary text-text-main" 
-                      : "border-transparent text-text-muted/60 hover:text-text-main"
+                      : "border-transparent text-text-muted hover:text-text-main"
                   )}
                 >
                   <tab.icon size={14} className="md:size-4" />
@@ -424,7 +424,7 @@ export default function SearchDashboard() {
                   {tab.count !== undefined && (
                     <span className={cn(
                       "text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full",
-                      activeTab === tab.id ? "bg-primary/10 text-primary" : "bg-slate-100 text-text-muted/40"
+                      activeTab === tab.id ? "bg-primary/10 text-primary" : "bg-surface-alt text-text-muted"
                     )}>
                       {tab.count}
                     </span>

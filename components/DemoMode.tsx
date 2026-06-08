@@ -97,7 +97,7 @@ export function DemoMode() {
         className={`flex items-center gap-3 px-6 py-6 rounded-full font-black text-[10px] shadow-2xl transition-all uppercase tracking-widest border-2 ${
           isDemo 
             ? 'bg-primary text-white border-primary shadow-primary/20 accent-glow' 
-            : 'bg-white text-text-muted border-border-base hover:bg-slate-50 shadow-xl'
+            : 'bg-white text-text-muted border-border-base hover:bg-surface-alt shadow-xl'
         }`}
       >
         {isBootstrapping ? (

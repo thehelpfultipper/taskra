@@ -172,7 +172,7 @@ export default function JobsPage() {
               {(activeFilters.types.length > 0 || activeFilters.locations.length > 0 || activeFilters.industries.length > 0 || activeFilters.minMatch !== null) && (
                 <button 
                   onClick={() => setActiveFilters({ types: [], locations: [], industries: [], minMatch: null })}
-                  className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-primary-dark transition-colors"
+                  className="text-[9px] font-black uppercase tracking-widest text-primary hover:text-primary-hover transition-colors"
                 >
                   Reset
                 </button>
@@ -265,7 +265,7 @@ export default function JobsPage() {
             </div>
           </Card>
 
-          <Card className="p-6 bg-slate-900 text-white border-none overflow-hidden relative group shadow-xl shadow-slate-900/20 rounded-2xl">
+          <Card className="p-6 bg-ink text-white border-none overflow-hidden relative group shadow-xl shadow-ink/20 rounded-2xl">
             <div className="absolute -right-8 -top-8 h-32 w-32 bg-primary/20 rounded-full blur-3xl group-hover:bg-primary/30 transition-all duration-700" />
             <div className="absolute -left-8 -bottom-8 h-32 w-32 bg-emerald-500/10 rounded-full blur-3xl group-hover:bg-emerald-500/20 transition-all duration-700" />
             
@@ -335,7 +335,7 @@ export default function JobsPage() {
                 initial={{ opacity: 0, y: 50, x: '-50%' }}
                 animate={{ opacity: 1, y: 0, x: '-50%' }}
                 exit={{ opacity: 0, y: 20, x: '-50%' }}
-                className="fixed bottom-8 left-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl text-xs font-bold uppercase tracking-widest flex items-center gap-3 border border-white/10"
+                className="fixed bottom-8 left-1/2 z-50 bg-ink text-white px-6 py-3 rounded-2xl shadow-2xl text-xs font-bold uppercase tracking-widest flex items-center gap-3 border border-white/10"
               >
                 <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                 {toast}

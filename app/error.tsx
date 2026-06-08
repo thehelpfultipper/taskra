@@ -30,7 +30,7 @@ export default function Error({
         </p>
         
         {process.env.NODE_ENV === 'development' && (
-          <div className="mb-10 p-4 bg-slate-100 rounded-xl text-left overflow-auto max-h-40">
+          <div className="mb-10 p-4 bg-surface-alt rounded-xl text-left overflow-auto max-h-40">
             <p className="text-[10px] font-mono text-red-600 break-all">{error.message}</p>
           </div>
         )}

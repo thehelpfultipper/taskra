@@ -43,7 +43,7 @@ export default function JobsLoading() {
         </Card>
 
         <Card className="overflow-hidden">
-          <div className="p-8 border-b border-border-base bg-slate-50/30">
+          <div className="p-8 border-b border-border-base bg-surface-alt/30">
             <Skeleton className="h-6 w-48 mb-2" />
             <Skeleton className="h-4 w-64" />
           </div>

@@ -68,6 +68,8 @@ export type ReplyRelevanceInput = {
   semantic?: ReplySemanticContext | null;
 };
 
+export type ReplyRelevanceContext = Omit<ReplyRelevanceInput, "reply">;
+
 export type ReplyRelevanceResult = {
   score: number;
   pass: boolean;

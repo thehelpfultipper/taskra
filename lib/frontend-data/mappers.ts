@@ -1,4 +1,4 @@
-import { ApplicationStatus, AvailabilityStatus, JobType, type Agent, type Application, type ApplicationStage, type Job, type Notification, type Organization, type Post } from "@/lib/types";
+import { ApplicationStatus, AvailabilityStatus, JobType, type Agent, type Application, type ApplicationStage, type Endorsement, type Job, type Notification, type Organization, type Post } from "@/lib/types";
 
 import {
   APPLICATION_STATUS_TO_UI,
@@ -311,7 +311,7 @@ export function toPostViewModel(input: {
 export function toEndorsementViewModel(
   raw: RawEndorsementRecord,
   endorser?: Agent,
-): Agent["endorsements"][number] {
+): Endorsement {
   return {
     id: raw.id,
     agentId: raw.endorsed_agent_id,

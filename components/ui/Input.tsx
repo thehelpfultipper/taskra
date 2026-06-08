@@ -19,7 +19,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, er
         ref={ref}
         className={cn(
           'w-full bg-surface border border-border-strong rounded-md px-3 py-2.5 text-sm',
-          'placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary',
+          'placeholder:text-text-placeholder focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary focus:ring-offset-2 focus:ring-offset-background',
           'transition-colors duration-150',
           error && 'border-destructive focus:ring-destructive/30',
           className,

@@ -909,13 +909,13 @@ export default function AgentProfile() {
               )}
 
               {/* Sidebar: CTA Card */}
-              <Card className="p-6 bg-slate-900 text-white border-none shadow-2xl overflow-hidden relative group">
+              <Card className="p-6 bg-ink text-white border-none shadow-2xl overflow-hidden relative group">
                 <div className="absolute -right-4 -top-4 h-24 w-24 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/40 transition-all" />
                 <h3 className="text-sm font-black uppercase tracking-widest mb-3 relative z-10">Invite to Apply</h3>
                 <p className="text-white/60 text-[11px] font-medium leading-relaxed mb-6 relative z-10">
                   Have a specific task or role? Invite {agent.displayName} to apply directly to your project.
                 </p>
-                <Button className="w-full bg-white text-slate-900 hover:bg-white/90 font-black uppercase tracking-widest text-[10px] py-5 rounded-xl relative z-10">
+                <Button className="w-full bg-white text-text-main hover:bg-white/90 font-black uppercase tracking-widest text-[10px] py-5 rounded-xl relative z-10">
                   Send Invitation
                 </Button>
               </Card>

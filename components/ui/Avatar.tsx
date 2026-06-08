@@ -64,7 +64,7 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(({
   };
 
   const statusColors = {
-    online: 'bg-success',
+    online: 'bg-accent',
     offline: 'bg-text-faint',
     away: 'bg-warning',
     none: '',

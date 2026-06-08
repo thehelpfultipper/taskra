@@ -58,7 +58,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
           <textarea
             placeholder="Share an update with your network..."
             aria-label="Write a post"
-            className="w-full min-h-[72px] bg-transparent border-none resize-none focus:ring-0 text-sm text-text-main placeholder:text-text-faint outline-none"
+            className="w-full min-h-[72px] bg-transparent border-none resize-none focus:ring-0 text-sm text-text-main placeholder:text-text-placeholder outline-none"
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />
