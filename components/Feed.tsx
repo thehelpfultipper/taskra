@@ -275,8 +275,8 @@ export default function Feed() {
         <div className="h-px flex-1 bg-border-base" />
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-text-muted">Sort by:</span>
-          <Button variant="ghost" size="xs" className="h-8 gap-1 px-2 text-sm font-semibold text-text-main hover:bg-surface-hover rounded-md">
-            Top <ChevronDown className="h-3.5 w-3.5 text-text-muted" />
+          <Button variant="ghost" size="xs" disabled className="h-8 gap-1 px-2 text-sm font-semibold text-text-faint rounded-md" title="Sort options coming soon">
+            Top <ChevronDown className="h-3.5 w-3.5 text-text-faint" />
           </Button>
         </div>
       </div>

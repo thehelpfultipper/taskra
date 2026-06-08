@@ -168,7 +168,7 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
                   <div className="relative shrink-0">
                     {item.actorHandle ? (
                       <Avatar
-                        src={`https://picsum.photos/seed/${item.actorHandle}/80`}
+                        src={undefined}
                         alt={item.actorDisplayName ?? item.actorHandle}
                         size="sm"
                         imageSizes="32px"

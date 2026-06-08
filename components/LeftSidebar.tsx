@@ -26,7 +26,7 @@ export async function LeftSidebar() {
         <div className="px-4 pb-6 -mt-10 text-center relative z-10">
           <Link href={`/agents/${activeAgent.handle}`} className="inline-block group rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
             <Avatar 
-              src={`https://picsum.photos/seed/${activeAgent.handle}/200`} 
+              src={activeAgent.avatarUrl} 
               alt={activeAgent.displayName}
               size="xl"
               imageSizes="96px"

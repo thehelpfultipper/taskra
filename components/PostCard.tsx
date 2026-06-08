@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MessageSquare, Repeat2, Send, ThumbsUp, MoreHorizontal, Globe, Zap, Bookmark, Share2, Check, UserPlus, UserMinus } from 'lucide-react';
+import { MessageSquare, Repeat2, Send, ThumbsUp, MoreHorizontal, Globe, Zap, Bookmark, Check, UserPlus, UserMinus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import Image from 'next/image';
 import { Card, CardHeader, CardContent, CardFooter } from './ui/Card';
 import { Avatar } from './ui/Avatar';
 import { Badge } from './ui/Badge';
@@ -43,7 +42,6 @@ export function PostCard({
   const [showComments, setShowComments] = useState(initialShowComments);
   const [comments, setComments] = useState(post.comments || []);
   const [newComment, setNewComment] = useState('');
-  const [isReposted, setIsReposted] = useState(false);
   const [viewerAgent, setViewerAgent] = useState<Pick<Agent, 'id' | 'displayName' | 'handle' | 'avatarUrl' | 'headline'> | null>(null);
   const [reacted, setReacted] = useState(false);
 
@@ -171,9 +169,6 @@ export function PostCard({
     }
   };
 
-  const handleShare = (action: string) => {
-    toast.info(`${action} feature coming soon! (Mock UI only)`);
-  };
 
   return (
     <Card
@@ -188,7 +183,7 @@ export function PostCard({
         <div className="flex gap-3 w-full sm:w-auto min-w-0">
           <Link href={authorLink} className="group shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
             <Avatar 
-              src={author.image || `https://picsum.photos/seed/${author.id}/200`} 
+              src={author.image} 
               alt={author.displayName || 'Author'}
               size="lg"
               className="group-hover:opacity-90 transition-opacity"
@@ -252,8 +247,8 @@ export function PostCard({
               <Bookmark className={cn("h-3.5 w-3.5 md:h-4 md:w-4", isSaved(post.id) && "fill-current")} />
             </Button>
           </Tooltip>
-          <Tooltip content="More Options">
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-text-main rounded-full hover:bg-surface-hover transition-colors">
+          <Tooltip content="More options (coming soon)">
+            <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-text-faint rounded-full">
               <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </Tooltip>
@@ -268,9 +263,9 @@ export function PostCard({
         {post.tags && post.tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {post.tags.map(tag => (
-              <span key={tag} className="text-sm font-medium text-primary hover:underline cursor-pointer">
+              <Link key={tag} href={`/search?q=${encodeURIComponent(tag)}`} className="text-sm font-medium text-primary hover:underline">
                 #{tag}
-              </span>
+              </Link>
             ))}
           </div>
         )}
@@ -283,7 +278,7 @@ export function PostCard({
       </CardContent>
 
       <div className="py-2 px-4 border-t border-border-base flex items-center justify-between text-xs text-text-muted">
-        <div className="flex items-center gap-2 group cursor-pointer rounded-md px-1 py-0.5 hover:bg-surface-hover transition-colors">
+        <div className="flex items-center gap-2 rounded-md px-1 py-0.5">
           <div className="flex -space-x-1">
             <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center border border-surface">
               <ThumbsUp className="h-2 w-2 text-white fill-white" />
@@ -292,7 +287,7 @@ export function PostCard({
               <Zap className="h-2 w-2 text-white fill-white" />
             </div>
           </div>
-          <span className="group-hover:text-primary transition-colors font-medium">{likeCount} endorsements</span>
+          <span className="font-medium">{likeCount} endorsements</span>
         </div>
         <div className="flex gap-3">
           <button 
@@ -301,7 +296,7 @@ export function PostCard({
           >
             {comments.length} syncs
           </button>
-          <span className="hover:text-primary hover:underline cursor-pointer transition-colors font-medium">{post._count.shares} propagations</span>
+          <span className="font-medium">{post._count.shares} propagations</span>
         </div>
       </div>
       
@@ -334,29 +329,23 @@ export function PostCard({
             <span className="hidden sm:inline">Sync</span>
           </Button>
         </Tooltip>
-        <Tooltip content="Propagate to Network" className="flex-1">
+        <Tooltip content="Propagate (coming soon)" className="flex-1">
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => {
-              setIsReposted(!isReposted);
-              handleShare('Propagate');
-            }}
-            className={cn(
-              "w-full gap-1.5 rounded-md py-2.5 min-h-[40px] transition-colors",
-              isReposted ? "text-success bg-success/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
-            )}
+            disabled
+            className="w-full gap-1.5 rounded-md py-2.5 min-h-[40px] text-text-faint"
           >
             <Repeat2 className="h-4 w-4" />
             <span className="hidden sm:inline">Propagate</span>
           </Button>
         </Tooltip>
-        <Tooltip content="Route to Agent" className="flex-1">
+        <Tooltip content="Route to agent (coming soon)" className="flex-1">
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => handleShare('Route')}
-            className="w-full gap-1.5 text-text-muted hover:bg-surface-hover hover:text-text-main rounded-md py-2.5 min-h-[40px] transition-colors"
+            disabled
+            className="w-full gap-1.5 rounded-md py-2.5 min-h-[40px] text-text-faint"
           >
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">Route</span>

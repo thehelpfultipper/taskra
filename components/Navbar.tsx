@@ -12,7 +12,6 @@ import {
   Home, 
   Briefcase, 
   Users, 
-  ChevronDown,
   Sparkles,
   Zap,
   Globe,
@@ -30,6 +29,7 @@ import { Tooltip } from './ui/Tooltip';
 import { motion, AnimatePresence } from 'motion/react';
 import { getCurrentUser } from '@/lib/auth';
 import { User as UserType } from '@/lib/types';
+import { toast } from 'sonner';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -49,13 +49,18 @@ export function Navbar() {
 
   const activeAgent = user?.agents[0];
 
-  const navItems = [
+  const navItems: Array<{
+    label: string;
+    href: string;
+    icon: typeof Home;
+    badge?: number;
+  }> = [
     { label: 'Home', href: '/', icon: Home },
     { label: 'Network', href: '/network', icon: Users },
     { label: 'Jobs', href: '/jobs', icon: Briefcase },
     { label: 'Applications', href: '/applications', icon: FileText },
     { label: 'Messaging', href: '/messages', icon: MessageSquare },
-    { label: 'Telemetry', href: '/notifications', icon: Bell, badge: 3 },
+    { label: 'Telemetry', href: '/notifications', icon: Bell },
     { label: 'Saved Items', href: '/saved', icon: Bookmark },
   ];
 
@@ -63,11 +68,11 @@ export function Navbar() {
     { id: 'profile', label: 'View Profile', icon: User, onClick: () => router.push(activeAgent ? `/agents/${activeAgent.handle}` : '/network') },
     { id: 'saved', label: 'Saved Items', icon: Bookmark, onClick: () => router.push('/saved') },
     { id: 'settings', label: 'Settings', icon: Settings, onClick: () => router.push('/settings') },
-    { id: 'logout', label: 'Sign Out', icon: LogOut, variant: 'danger' as const, onClick: () => {} },
+    { id: 'logout', label: 'Sign Out', icon: LogOut, variant: 'danger' as const, onClick: () => toast.info('Sign out is not available in this demo.') },
   ];
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-surface border-b border-border-base h-14 flex items-center">
+    <nav className="sticky top-0 z-50 w-full bg-surface border-b border-border-base h-14 flex items-center overflow-visible">
       <div className="container-main flex items-center justify-between gap-4 md:gap-6">
         {/* Logo */}
         <div className="flex items-center gap-4 flex-shrink-0">
@@ -147,7 +152,7 @@ export function Navbar() {
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-0.5 sm:gap-2">
+        <div className="flex items-center gap-0.5 sm:gap-2 overflow-visible">
           {/* Mobile Search Toggle */}
           <Button
             variant="ghost"
@@ -158,14 +163,14 @@ export function Navbar() {
             <Search size={18} />
           </Button>
 
-          <div className="hidden sm:flex items-center gap-0.5 pr-2 border-r border-border-base/50">
-             <Tooltip content="Global Mesh">
-               <Button variant="ghost" size="icon" className="text-text-secondary hover:text-primary h-9 w-9">
+          <div className="hidden sm:flex items-center gap-0.5 pr-2 border-r border-border-base/50 overflow-visible">
+             <Tooltip content="Global Mesh" position="bottom">
+               <Button variant="ghost" size="icon" className="text-text-secondary hover:text-primary h-9 w-9" onClick={() => router.push('/network')} aria-label="Global Mesh">
                  <Globe size={16} />
                </Button>
              </Tooltip>
-             <Tooltip content="AI Insights">
-               <Button variant="ghost" size="icon" className="text-text-secondary hover:text-primary h-9 w-9">
+             <Tooltip content="AI Insights" position="bottom">
+               <Button variant="ghost" size="icon" className="text-text-secondary hover:text-primary h-9 w-9" onClick={() => router.push('/search')} aria-label="AI Insights">
                  <Sparkles size={16} />
                </Button>
              </Tooltip>
@@ -173,21 +178,25 @@ export function Navbar() {
 
           <Dropdown
             trigger={
-              <button className="flex flex-col items-center justify-center min-w-[48px] sm:min-w-[56px] h-14 text-text-muted hover:text-text-main group transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
-                <Avatar 
-                  src={activeAgent?.avatarUrl || "https://picsum.photos/seed/agent-me/100/100"} 
-                  alt="My Profile" 
-                  size="xs" 
-                  imageSizes="24px"
-                  status="online"
-                  className="group-hover:ring-2 group-hover:ring-primary/10 transition-all border-transparent"
-                />
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs font-medium leading-none">
-                    {user && user.agents.length > 1 ? `${user.agents.length} Agents` : 'Me'}
-                  </span>
-                  <ChevronDown size={8} />
+              <button className="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[56px] h-14 overflow-visible text-text-muted hover:text-text-main group transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
+                <div className="relative">
+                  <Avatar 
+                    src={activeAgent?.avatarUrl} 
+                    alt={activeAgent?.displayName || 'My Profile'} 
+                    size="sm" 
+                    imageSizes="32px"
+                    status="online"
+                    className="group-hover:ring-2 group-hover:ring-primary/10 transition-all"
+                  />
+                  {user && user.agents.length > 1 && (
+                    <span className="absolute -top-1 -right-1.5 h-4 min-w-[16px] px-1 bg-primary text-white text-[10px] font-semibold rounded-full flex items-center justify-center border-2 border-surface">
+                      {user.agents.length}
+                    </span>
+                  )}
                 </div>
+                <span className="text-[10px] sm:text-xs font-medium leading-none mt-0.5">
+                  Me
+                </span>
               </button>
             }
             items={profileItems}

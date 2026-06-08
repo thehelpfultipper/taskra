@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn } from '@/lib/utils';
+import { isPlaceholderAvatar } from '@/lib/avatar-utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -149,7 +150,7 @@ export function OrgIdentityCard({
   return (
     <div className={cn("flex items-center gap-3 group cursor-pointer", className)}>
       <Link href={`/orgs/${org.slug}`} className="relative h-10 w-10 rounded-lg bg-surface flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors overflow-hidden border border-border-base">
-        {org.logoUrl ? (
+        {org.logoUrl && !isPlaceholderAvatar(org.logoUrl) ? (
           <Image 
             src={org.logoUrl} 
             alt={org.name} 
@@ -186,31 +187,44 @@ export function ArtifactCard({
   onClick?: () => void;
   className?: string; 
 }) {
+  const hasPreview = artifact.previewUrl && !isPlaceholderAvatar(artifact.previewUrl);
+
   return (
     <Card 
-      className={cn("overflow-hidden group cursor-pointer", className)}
+      className={cn("overflow-hidden group", onClick && "cursor-pointer", className)}
       onClick={onClick}
-      hover
+      hover={Boolean(onClick)}
       padding="none"
     >
-      <div className="relative aspect-video">
-        <Image 
-          src={artifact.previewUrl || `https://picsum.photos/seed/${artifact.id}/800/450`} 
-          alt={artifact.title} 
-          fill
-          className="object-cover group-hover:scale-[1.02] transition-transform duration-700"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
-        <div className="absolute bottom-3 left-3 right-3 p-3 bg-surface/90 backdrop-blur-md rounded-lg border border-white/20 shadow-md transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold text-text-main line-clamp-1 break-words uppercase tracking-tight">{artifact.title}</div>
-              <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">{artifact.type} • {artifact.size || '1.2 MB'}</div>
-            </div>
-            <Button size="xs" variant="primary" className="h-7 text-[11px] font-bold shrink-0 ml-2">View</Button>
+      <div className="relative aspect-video bg-gradient-to-br from-primary/10 via-surface-alt to-accent/10">
+        {hasPreview ? (
+          <Image 
+            src={artifact.previewUrl!} 
+            alt={artifact.title} 
+            fill
+            className="object-cover group-hover:scale-[1.02] transition-transform duration-700"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-text-muted">
+            <FileText className="h-8 w-8 text-primary/60" />
+            <span className="text-xs font-semibold uppercase tracking-wide">{artifact.type}</span>
           </div>
-        </div>
+        )}
+        {onClick && (
+          <>
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+            <div className="absolute bottom-3 left-3 right-3 p-3 bg-surface/90 backdrop-blur-md rounded-lg border border-white/20 shadow-md transform translate-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-text-main line-clamp-1 break-words uppercase tracking-tight">{artifact.title}</div>
+                  <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">{artifact.type} • {artifact.size || '1.2 MB'}</div>
+                </div>
+                <Button size="xs" variant="primary" className="h-7 text-[11px] font-bold shrink-0 ml-2" disabled>View</Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Card>
   );
@@ -333,7 +347,7 @@ export function JobCard({
         {/* Header Section */}
         <div className="flex gap-8 mb-8">
           <div className="relative w-16 h-16 rounded-3xl bg-surface-alt flex items-center justify-center overflow-hidden border border-border-base/60 group-hover:border-primary/30 transition-all shadow-sm shrink-0">
-            {org?.logoUrl && org.logoUrl !== '#' ? (
+            {org?.logoUrl && !isPlaceholderAvatar(org.logoUrl) ? (
               <Image 
                 src={org.logoUrl} 
                 alt={org.name} 
@@ -494,7 +508,7 @@ export function ApplicationCard({
           <div className="flex items-start justify-between mb-10">
             <div className="flex gap-8">
               <div className="relative w-16 h-16 rounded-3xl bg-surface-alt flex items-center justify-center overflow-hidden border border-border-base/60 group-hover:border-primary/20 transition-all shadow-sm shrink-0">
-                {application.job?.org?.logoUrl ? (
+                {application.job?.org?.logoUrl && !isPlaceholderAvatar(application.job.org.logoUrl) ? (
                   <Image 
                     src={application.job.org.logoUrl} 
                     alt={application.job.org.name} 

@@ -49,7 +49,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
     <Card className="p-4">
       <div className="flex gap-3">
         <Avatar 
-          src={currentUser?.avatarUrl || 'https://picsum.photos/seed/viewer-agent/200'} 
+          src={currentUser?.avatarUrl} 
           alt={currentUser?.displayName || 'Viewer Agent'}
           size="md"
           className="shrink-0"
@@ -65,23 +65,23 @@ export function PostComposer({ onPost }: PostComposerProps) {
           
           <div className="mt-3 pt-3 border-t border-border-base flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-0.5">
-              <Tooltip content="Add media">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-text-muted hover:text-primary hover:bg-surface-hover">
+              <Tooltip content="Add media (coming soon)">
+                <Button variant="ghost" size="icon" disabled className="h-9 w-9 text-text-faint">
                   <ImageIcon className="h-5 w-5" />
                 </Button>
               </Tooltip>
-              <Tooltip content="Attach artifact">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-text-muted hover:text-primary hover:bg-surface-hover">
+              <Tooltip content="Attach artifact (coming soon)">
+                <Button variant="ghost" size="icon" disabled className="h-9 w-9 text-text-faint">
                   <FileText className="h-5 w-5" />
                 </Button>
               </Tooltip>
-              <Tooltip content="Create poll">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-text-muted hover:text-success hover:bg-surface-hover">
+              <Tooltip content="Create poll (coming soon)">
+                <Button variant="ghost" size="icon" disabled className="h-9 w-9 text-text-faint">
                   <BarChart2 className="h-5 w-5" />
                 </Button>
               </Tooltip>
-              <Tooltip content="Schedule event">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-text-muted hover:text-warning hover:bg-surface-hover">
+              <Tooltip content="Schedule event (coming soon)">
+                <Button variant="ghost" size="icon" disabled className="h-9 w-9 text-text-faint">
                   <Calendar className="h-5 w-5" />
                 </Button>
               </Tooltip>

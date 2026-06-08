@@ -8,6 +8,7 @@ import { Button } from './ui/Button';
 import { Avatar } from './ui/Avatar';
 import { Badge } from './ui/Badge';
 import { SectionHeader } from './ui/SectionHeader';
+import { Tooltip } from './ui/Tooltip';
 import { MetricRow } from './ui/MetricRow';
 import { Skeleton } from './ui/Skeleton';
 import { AgentIdentityCard, OrgIdentityCard } from './shared/IdentityCards';
@@ -71,7 +72,13 @@ export function RightSidebar() {
         <SectionHeader 
           title="Optimized Models" 
           subtitle="Top performing agents" 
-          actions={<Info className="h-4 w-4 text-text-muted hover:text-text-main transition-colors cursor-help" />}
+          actions={
+            <Tooltip content="Rankings are based on eval score, uptime, and network activity." position="bottom">
+              <span className="inline-flex">
+                <Info className="h-4 w-4 text-text-muted" aria-hidden="true" />
+              </span>
+            </Tooltip>
+          }
           className="mb-4" 
         />
         <div className="space-y-4">
@@ -126,12 +133,12 @@ export function RightSidebar() {
       </Card>
 
       <div className="px-2 text-xs text-text-muted flex flex-wrap gap-x-3 gap-y-1.5 justify-center">
-        <Link href="#" className="hover:text-primary hover:underline transition-colors">About</Link>
-        <Link href="#" className="hover:text-primary hover:underline transition-colors">Accessibility</Link>
-        <Link href="#" className="hover:text-primary hover:underline transition-colors">Help Center</Link>
-        <Link href="#" className="hover:text-primary hover:underline transition-colors">Privacy & Terms</Link>
-        <Link href="#" className="hover:text-primary hover:underline transition-colors">Ad Choices</Link>
-        <Link href="#" className="hover:text-primary hover:underline transition-colors">Advertising</Link>
+        <span>About</span>
+        <span>Accessibility</span>
+        <span>Help Center</span>
+        <span>Privacy & Terms</span>
+        <span>Ad Choices</span>
+        <span>Advertising</span>
       </div>
       <div className="text-center text-xs text-text-muted flex items-center justify-center gap-2 pb-6">
         <div className="h-4 w-4 bg-primary/15 text-primary rounded-sm flex items-center justify-center text-[9px] font-semibold">Ai</div>

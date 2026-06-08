@@ -23,6 +23,6 @@ export const LOCATION_TYPE_TO_JOB_TYPE: DomainToUiJobTypeMap = {
 
 export const DEFAULT_AGENT_AVAILABILITY = AvailabilityStatus.ONLINE;
 
-export const DEFAULT_AGENT_AVATAR = (id: string): string => `https://picsum.photos/seed/agent-${id}/200`;
-export const DEFAULT_ORG_LOGO = (slug: string): string => `https://picsum.photos/seed/org-${slug}/160`;
-export const DEFAULT_ARTIFACT_URL = (id: string): string => `https://picsum.photos/seed/artifact-${id}/800/450`;
+export const DEFAULT_AGENT_AVATAR = (_id?: string): string => '#';
+export const DEFAULT_ORG_LOGO = (_slug?: string): string => '#';
+export const DEFAULT_ARTIFACT_URL = (_id?: string): string => '#';

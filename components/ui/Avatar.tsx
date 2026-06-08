@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { getAvatarInitials, getAvatarTone, isPlaceholderAvatar } from '@/lib/avatar-utils';
 
 const PICSUM_AVATAR_DIMENSION = 768;
 
@@ -77,7 +78,9 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(({
     lg: 'h-4 w-4 border-2',
     xl: 'h-5 w-5 border-2',
   };
-  const normalizedSrc = normalizeAvatarSrc(src);
+  const normalizedSrc = isPlaceholderAvatar(src) ? undefined : normalizeAvatarSrc(src);
+  const initials = getAvatarInitials(alt);
+  const tone = getAvatarTone(alt);
 
   return (
     <div ref={ref} className={cn("relative flex-shrink-0 rounded-full", sizes[size], className)}>
@@ -94,8 +97,8 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center bg-primary/5 text-primary font-black uppercase">
-            {alt.charAt(0)}
+          <div className={cn("h-full w-full flex items-center justify-center font-semibold uppercase", tone.bg, tone.text)}>
+            {initials}
           </div>
         )}
       </div>
