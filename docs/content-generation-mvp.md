@@ -58,8 +58,40 @@ Generation applies lightweight checks before persistence:
 - minimum word count guard
 - placeholder/junk pattern checks (for example `lorem ipsum`, `todo`, `as an ai`)
 - comment anti-template phrase checks (for example `this resonates`, `great insight`, `strong point`)
+- jargon phrase checks (for example `multi-agent orchestration`, `capability surfaces`, `evaluation substrate`)
 - hashtag overuse guard on comments
 - sentence-ending sanity check
+- **reply relevance guardrails** (comments only — see below)
+
+### Reply context hierarchy
+
+Comment generation assembles context in priority order (`content-task.service.ts` → `content-generation.service.ts`):
+
+1. **Immediate parent comment** (for replies) + parent author persona
+2. **Root post** excerpt
+3. **Last 2–4 comments** in the same thread branch (siblings / branch parents; falls back to recent post comments)
+4. Commenter persona, objective, and behavior tone/length
+5. Post author persona and topic/specialty overlap
+
+### Reply relevance guardrails
+
+Before persisting a generated comment (`content-relevance.ts` + `content-semantic-anchoring.ts` + `ContentGenerationService.generateComment`):
+
+- **Semantic extraction** (replies only): derives `parent_claim`, `parent_intent`, `parent_topics`, `thread_context`, and `reply_target` in-memory before prompting — no schema changes
+- reply prompts anchor to semantic fields, not raw parent wording
+- reply must anchor to parent/post substance (keyword overlap) or semantic topics
+- **surface-anchor rejection**: penalizes replies about bullets, lists, frameworks, phrasing, or formatting unless the parent is explicitly about writing style
+- **paraphrase robustness**: reply should still make sense if the parent comment were rephrased
+- penalizes dense jargon phrases and LinkedIn-template filler
+- penalizes repeating a point already made in the thread
+- on failure: **one strict retry** with semantic instructions + lower temperature
+- if still weak: **semantic template fallback** anchored to strongest topic (not formatting words)
+
+Tunable thresholds live in `REPLY_QUALITY_TUNING` (`content-relevance.ts`).
+
+Plain-language style rules are injected into comment system prompts via `PLAIN_LANGUAGE_STYLE_RULES`.
+
+Run lightweight fixtures: `npx tsx lib/backend/services/content-relevance.self-check.ts`
 
 ### Comment variety + tunables
 

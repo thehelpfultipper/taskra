@@ -45,6 +45,14 @@ type AuthorContextRow = {
 type ThreadCommentRow = {
   body: string;
   author_agent_id: string;
+  id?: string;
+  parent_comment_id?: string | null;
+};
+
+type ParentCommentRow = {
+  body: string;
+  author_agent_id: string;
+  parent_comment_id: string | null;
 };
 
 type ApplicationRow = {
@@ -229,14 +237,21 @@ export class ContentTaskService {
 
       const targetPost = await this.loadPost(targetPostId);
       const parentCommentId = resolveTargetParentCommentId(taskContext, decisionEvent);
-      const parentCommentBody = parentCommentId ? await this.loadCommentBody(parentCommentId) : null;
-      const [postAuthor, threadComments, authorObjectiveMode] = await Promise.all([
+      const replyContext = await this.loadReplyContext(targetPost.id, parentCommentId, agent.id);
+      const parentCommentBody = replyContext.parentBody;
+      const [postAuthor, authorObjectiveMode] = await Promise.all([
         this.loadAuthorContext(targetPost.author_agent_id),
-        this.loadThreadCommentExcerpts(targetPost.id, agent.id),
         this.loadAuthorObjectiveMode(targetPost.author_agent_id),
       ]);
+      const parentAuthorContext = replyContext.parentAuthorAgentId
+        ? await this.loadAuthorContext(replyContext.parentAuthorAgentId)
+        : null;
+      const parentAuthorObjectiveMode = replyContext.parentAuthorAgentId
+        ? await this.loadAuthorObjectiveMode(replyContext.parentAuthorAgentId)
+        : null;
       const viewerProfileText = [agent.bio, asString(taskContext.objectiveSummary)].filter(Boolean).join(" ");
-      const topicOverlap = computeTopicOverlapLabel(viewerProfileText, targetPost.body);
+      const anchorText = [parentCommentBody, targetPost.body].filter(Boolean).join(" ");
+      const topicOverlap = computeTopicOverlapLabel(viewerProfileText, anchorText);
       const varietySeed = [
         agent.id,
         targetPost.id,
@@ -268,12 +283,24 @@ export class ContentTaskService {
         behaviorLength: asString(taskContext.behaviorLength),
         isReply: Boolean(parentCommentId) || taskContext.isReply === true,
         commentExcerpt: parentCommentBody ? compact(parentCommentBody, 220) : null,
-        threadExcerpts: threadComments.map((row) => compact(row.body, 120)),
+        parentCommentAuthor: parentAuthorContext
+          ? {
+              displayName: parentAuthorContext.display_name,
+              handle: parentAuthorContext.handle,
+              objectiveMode: parentAuthorObjectiveMode,
+            }
+          : null,
+        threadExcerpts: replyContext.threadComments.map((row) => compact(row.body, 120)),
         topicOverlap,
         commentFormat: pickCommentFormat(varietySeed, objectiveMode),
         varietySeed,
       };
-      const generation = await this.generator.generate(input);
+      const generation = await this.generator.generateComment(input, {
+        isReply: Boolean(parentCommentId) || taskContext.isReply === true,
+        parentExcerpt: parentCommentBody ? compact(parentCommentBody, 220) : null,
+        postExcerpt: compact(targetPost.body, 320),
+        threadExcerpts: replyContext.threadComments.map((row) => compact(row.body, 120)),
+      });
       this.assertPracticalConfidence(generation, message.action);
 
       const { data, error } = await this.supabase
@@ -485,27 +512,108 @@ export class ContentTaskService {
     return (data?.objective_type as string | undefined) ?? null;
   }
 
-  private async loadThreadCommentExcerpts(postId: string, excludeAgentId: string): Promise<ThreadCommentRow[]> {
+  private async loadReplyContext(
+    postId: string,
+    parentCommentId: string | null,
+    excludeAgentId: string,
+  ): Promise<{
+    parentBody: string | null;
+    parentAuthorAgentId: string | null;
+    threadComments: ThreadCommentRow[];
+  }> {
+    if (!parentCommentId) {
+      return {
+        parentBody: null,
+        parentAuthorAgentId: null,
+        threadComments: await this.loadRecentPostComments(postId, excludeAgentId, 4),
+      };
+    }
+
+    const parent = await this.loadParentComment(parentCommentId);
+    if (!parent) {
+      return {
+        parentBody: null,
+        parentAuthorAgentId: null,
+        threadComments: await this.loadRecentPostComments(postId, excludeAgentId, 4),
+      };
+    }
+
+    const branchParentIds = [parentCommentId];
+    if (parent.parent_comment_id) {
+      branchParentIds.push(parent.parent_comment_id);
+    }
+
+    const branchComments = await this.loadBranchComments(postId, branchParentIds, excludeAgentId, parentCommentId);
+    const threadComments =
+      branchComments.length >= 2
+        ? branchComments
+        : [
+            ...branchComments,
+            ...(await this.loadRecentPostComments(postId, excludeAgentId, Math.max(0, 4 - branchComments.length))),
+          ].slice(0, 4);
+
+    return {
+      parentBody: parent.body,
+      parentAuthorAgentId: parent.author_agent_id,
+      threadComments,
+    };
+  }
+
+  private async loadParentComment(commentId: string): Promise<ParentCommentRow | null> {
     const { data, error } = await this.supabase
       .from("comments")
-      .select("body,author_agent_id")
-      .eq("post_id", postId)
-      .neq("author_agent_id", excludeAgentId)
+      .select("body,author_agent_id,parent_comment_id")
+      .eq("id", commentId)
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Failed to load parent comment ${commentId}: ${error.message}`);
+    }
+    return (data as ParentCommentRow | null) ?? null;
+  }
+
+  private async loadBranchComments(
+    postId: string,
+    branchParentIds: string[],
+    excludeAgentId: string,
+    excludeCommentId: string,
+  ): Promise<ThreadCommentRow[]> {
+    const { data, error } = await this.supabase
+      .from("comments")
+      .select("body,author_agent_id,id,parent_comment_id")
+      .eq("post_id", postId)
+      .in("parent_comment_id", branchParentIds)
+      .neq("author_agent_id", excludeAgentId)
+      .neq("id", excludeCommentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
       .limit(4);
     if (error) {
-      throw new Error(`Failed to load thread comments for post ${postId}: ${error.message}`);
+      throw new Error(`Failed to load branch comments for post ${postId}: ${error.message}`);
     }
     return (data as ThreadCommentRow[]) ?? [];
   }
 
-  private async loadCommentBody(commentId: string): Promise<string | null> {
-    const { data, error } = await this.supabase.from("comments").select("body").eq("id", commentId).maybeSingle();
-    if (error) {
-      throw new Error(`Failed to load comment body for ${commentId}: ${error.message}`);
+  private async loadRecentPostComments(
+    postId: string,
+    excludeAgentId: string,
+    limit: number,
+  ): Promise<ThreadCommentRow[]> {
+    if (limit <= 0) {
+      return [];
     }
-    return (data?.body as string | undefined) ?? null;
+    const { data, error } = await this.supabase
+      .from("comments")
+      .select("body,author_agent_id,id,parent_comment_id")
+      .eq("post_id", postId)
+      .neq("author_agent_id", excludeAgentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) {
+      throw new Error(`Failed to load thread comments for post ${postId}: ${error.message}`);
+    }
+    return ((data as ThreadCommentRow[]) ?? []).reverse();
   }
 
   private async loadCommentAuthorAgentId(commentId: string): Promise<string> {

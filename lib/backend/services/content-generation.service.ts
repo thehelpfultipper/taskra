@@ -3,6 +3,15 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 
 import { hashString } from "@/lib/backend/services/activity-tuning";
+import {
+  countJargonPhrases,
+  evaluateReplyRelevance,
+  extractReplySemanticContext,
+  PLAIN_LANGUAGE_STYLE_RULES,
+  type ReplyRelevanceInput,
+  type ReplySemanticContext,
+} from "@/lib/backend/services/content-relevance";
+import { buildSemanticFallbackReply } from "@/lib/backend/services/content-semantic-anchoring";
 
 export type GeneratedContentKind = "feed_post" | "comment" | "application_cover_note";
 
@@ -72,10 +81,16 @@ export type ContentGenerationInput =
       behaviorLength?: string | null;
       isReply?: boolean;
       commentExcerpt?: string | null;
+      parentCommentAuthor?: {
+        displayName: string;
+        handle: string;
+        objectiveMode: string | null;
+      } | null;
       threadExcerpts?: string[];
       topicOverlap: string | null;
       commentFormat: CommentFormat;
       varietySeed: string;
+      semanticContext?: ReplySemanticContext | null;
     }
   | {
       kind: "application_cover_note";
@@ -100,6 +115,11 @@ type PromptSpec = {
   maxOutputTokens: number;
   minChars: number;
   maxChars: number;
+};
+
+type CommentPromptOptions = {
+  strictRelevance?: boolean;
+  semanticContext?: ReplySemanticContext | null;
 };
 
 const PLACEHOLDER_PATTERNS = [
@@ -169,6 +189,11 @@ function evaluateQuality(
       score -= Math.min(0.55, 0.2 + templateHits.length * 0.12);
       checks.push(`template_phrase:${templateHits.join("|")}`);
     }
+    const jargonHits = countJargonPhrases(trimmed);
+    if (jargonHits.length > 0) {
+      score -= Math.min(0.5, jargonHits.length * 0.16);
+      checks.push(`jargon_phrase:${jargonHits.join("|")}`);
+    }
     const hashtagCount = (trimmed.match(/#\w+/g) ?? []).length;
     if (hashtagCount > 1) {
       score -= 0.25;
@@ -212,15 +237,15 @@ function toneInstruction(tone: string | null | undefined): string {
 function personaVoiceInstruction(objectiveMode: string | null | undefined): string {
   switch (objectiveMode) {
     case "thought_leader":
-      return "Persona: thought leader — insightful and specific, okay to be slightly rough or unfinished; skip guru polish.";
+      return "Persona: thought leader — clear and useful, not grandiose; one concrete insight beats abstract framing.";
     case "open_to_work":
-      return "Persona: open to work — earnest, curious, supportive; show genuine interest in the topic or people.";
+      return "Persona: open to work — practical and curious; ask real questions, show you read the thread.";
     case "recruiter":
-      return "Persona: recruiter — concise and practical; mention fit, timing, or next step only when it fits naturally.";
+      return "Persona: recruiter — direct and opportunity-aware; plain language, no buzzword screening theater.";
     case "org_publisher":
-      return "Persona: org representative — brand-aware but human; no press-release tone.";
+      return "Persona: org representative — polished but human-readable; skip press-release phrasing.";
     case "passive_candidate":
-      return "Persona: passive candidate — low-key, selective engagement; comment only when you have a real angle.";
+      return "Persona: passive candidate — low-key, selective; comment only when you have a specific angle.";
     default:
       return "Persona: professional network participant — sound like a person, not a template.";
   }
@@ -283,7 +308,119 @@ function lengthInstruction(length: string | null | undefined, kind: GeneratedCon
   return kind === "comment" ? "Use 1-3 sentences." : "Use 2-4 sentences.";
 }
 
-function buildPromptSpec(input: ContentGenerationInput): PromptSpec {
+function buildCommentPromptSpec(
+  input: Extract<ContentGenerationInput, { kind: "comment" }>,
+  options?: CommentPromptOptions,
+): PromptSpec {
+  const semantic =
+    options?.semanticContext ??
+    input.semanticContext ??
+    (input.isReply && input.commentExcerpt
+      ? extractReplySemanticContext({
+          parentExcerpt: input.commentExcerpt,
+          postExcerpt: input.postExcerpt,
+          threadExcerpts: input.threadExcerpts,
+          varietySeed: input.varietySeed,
+        })
+      : null);
+
+  const threadLines =
+    input.threadExcerpts && input.threadExcerpts.length > 0
+      ? `Earlier in this thread (do not repeat these points): ${input.threadExcerpts.map((excerpt, index) => `[${index + 1}] ${compact(excerpt, 90)}`).join(" ")}`
+      : null;
+
+  const semanticBlock =
+    input.isReply && semantic
+      ? [
+          "SEMANTIC ANCHOR — respond to meaning, not surface wording:",
+          `Parent claim: ${semantic.parent_claim}`,
+          `Parent intent: ${semantic.parent_intent}`,
+          `Topics: ${semantic.parent_topics.join("; ")}`,
+          `Thread context: ${semantic.thread_context}`,
+          `Reply target: ${semantic.reply_target}`,
+          "Do NOT comment on bullets, lists, frameworks, phrasing, or formatting unless the parent is explicitly about writing style.",
+        ]
+      : null;
+
+  const priorityBlock = input.isReply && input.commentExcerpt
+    ? [
+        ...(semanticBlock ?? []),
+        "PRIORITY 1 — Parent comment (reference for context only; respond to semantic anchor above):",
+        compact(input.commentExcerpt, 220),
+        input.parentCommentAuthor
+          ? `Parent author: ${input.parentCommentAuthor.displayName} (@${input.parentCommentAuthor.handle})${input.parentCommentAuthor.objectiveMode ? ` [${input.parentCommentAuthor.objectiveMode}]` : ""}`
+          : null,
+        "Your reply must engage the parent claim and reply target — not isolated words from the parent text.",
+      ]
+    : [
+        "PRIORITY 1 — Post you are commenting on:",
+        compact(input.postExcerpt, 280),
+        "React to one specific idea in the post.",
+      ];
+
+  const contextBlock = input.isReply
+    ? [`PRIORITY 2 — Root post context: ${compact(input.postExcerpt, 220)}`, threadLines ? `PRIORITY 3 — ${threadLines}` : null]
+    : [threadLines ? `PRIORITY 2 — ${threadLines}` : null];
+
+  const personaBlock = [
+    `Commenter: ${input.agent.displayName} (@${input.agent.handle})`,
+    input.agent.bio ? `Commenter bio: ${compact(input.agent.bio, 140)}` : null,
+    personaVoiceInstruction(input.objectiveMode),
+    input.objectiveSummary ? `Commenter objective: ${compact(input.objectiveSummary, 160)}` : null,
+    input.postAuthor
+      ? `Post author: ${input.postAuthor.displayName} (@${input.postAuthor.handle})${input.postAuthor.objectiveMode ? ` [${input.postAuthor.objectiveMode}]` : ""}`
+      : null,
+    input.postAuthor?.bio ? `Author bio: ${compact(input.postAuthor.bio, 120)}` : null,
+    input.topicOverlap ? `Shared topic overlap: ${input.topicOverlap}` : null,
+  ];
+
+  const strictBlock = options?.strictRelevance
+    ? [
+        "STRICT RETRY: Your previous draft was off-topic, surface-level, repetitive, or too jargon-heavy.",
+        semantic
+          ? `Respond ONLY to: ${semantic.reply_target}. Parent claim: ${semantic.parent_claim}`
+          : "Respond to the underlying idea in the parent comment.",
+        "Do not mention bullets, lists, frameworks, phrasing, or formatting.",
+        "Do not introduce a new topic. Do not repeat a point already made in the thread.",
+      ]
+    : null;
+
+  return {
+    systemInstruction: [
+      "You write social comments as a specific AI agent persona on a professional network.",
+      ...PLAIN_LANGUAGE_STYLE_RULES,
+      "Avoid LinkedIn-template filler (e.g. 'great insight', 'this resonates', 'strong point', 'I'd add', 'excited to see').",
+      "No hashtags unless one appears naturally in the source material.",
+      "Plain text only — no quotes around the comment, no sign-off.",
+    ].join(" "),
+    userPrompt: [
+      ...priorityBlock,
+      ...contextBlock,
+      ...personaBlock,
+      strictBlock,
+      input.actionRationale ? `Why commenting: ${compact(input.actionRationale, 120)}` : null,
+      commentFormatInstruction(input.commentFormat),
+      toneInstruction(input.behaviorTone),
+      lengthInstruction(input.behaviorLength, "comment"),
+      input.isReply
+        ? "Task: Write ONE reply that engages the parent claim and reply target. The reply should still make sense if the parent comment were rephrased."
+        : "Task: Write ONE comment on the post. React to a specific idea; vary structure.",
+    ]
+      .flat()
+      .filter(Boolean)
+      .join("\n"),
+    temperature: options?.strictRelevance
+      ? 0.62
+      : input.behaviorTone === "skeptical" || input.commentFormat === "friendly_disagreement"
+        ? 0.78
+        : 0.74,
+    maxOutputTokens: input.behaviorLength === "short" ? 80 : input.behaviorLength === "longer" ? 200 : 150,
+    minChars: input.behaviorLength === "short" ? 8 : 24,
+    maxChars: input.behaviorLength === "longer" ? 520 : 420,
+  };
+}
+
+function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptOptions): PromptSpec {
   if (input.kind === "feed_post") {
     const feedContext =
       input.recentFeedExcerpts && input.recentFeedExcerpts.length > 0
@@ -332,48 +469,7 @@ function buildPromptSpec(input: ContentGenerationInput): PromptSpec {
   }
 
   if (input.kind === "comment") {
-    const threadLines =
-      input.threadExcerpts && input.threadExcerpts.length > 0
-        ? `Recent thread (do not repeat phrasing): ${input.threadExcerpts.map((excerpt, index) => `[${index + 1}] ${compact(excerpt, 90)}`).join(" ")}`
-        : null;
-    return {
-      systemInstruction: [
-        "You write social comments as a specific AI agent persona.",
-        "Sound like a real reply — reference something concrete from the post or parent comment.",
-        "Avoid LinkedIn-template filler (e.g. 'great insight', 'this resonates', 'strong point', 'I'd add', 'excited to see').",
-        "No hashtags unless one appears naturally in the source material.",
-        "Plain text only — no quotes around the comment, no sign-off.",
-      ].join(" "),
-      userPrompt: [
-        `Commenter: ${input.agent.displayName} (@${input.agent.handle})`,
-        input.agent.bio ? `Commenter bio: ${compact(input.agent.bio, 140)}` : null,
-        personaVoiceInstruction(input.objectiveMode),
-        input.objectiveSummary ? `Commenter objective: ${compact(input.objectiveSummary, 160)}` : null,
-        input.postAuthor
-          ? `Post author: ${input.postAuthor.displayName} (@${input.postAuthor.handle})${input.postAuthor.objectiveMode ? ` [${input.postAuthor.objectiveMode}]` : ""}`
-          : null,
-        input.postAuthor?.bio ? `Author bio: ${compact(input.postAuthor.bio, 120)}` : null,
-        input.topicOverlap ? `Shared topic overlap: ${input.topicOverlap}` : null,
-        `Post: ${compact(input.postExcerpt, 280)}`,
-        input.isReply && input.commentExcerpt
-          ? `Replying to: ${compact(input.commentExcerpt, 200)}`
-          : null,
-        input.isReply ? "This is a thread reply — respond to the parent comment, not just the post headline." : null,
-        threadLines,
-        input.actionRationale ? `Why commenting: ${compact(input.actionRationale, 120)}` : null,
-        commentFormatInstruction(input.commentFormat),
-        toneInstruction(input.behaviorTone),
-        lengthInstruction(input.behaviorLength, "comment"),
-        "Task: Write ONE comment. React to a specific idea. Vary structure — not every comment needs praise or a takeaway.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      temperature:
-        input.behaviorTone === "skeptical" || input.commentFormat === "friendly_disagreement" ? 0.82 : 0.78,
-      maxOutputTokens: input.behaviorLength === "short" ? 80 : input.behaviorLength === "longer" ? 200 : 150,
-      minChars: input.behaviorLength === "short" ? 8 : 24,
-      maxChars: input.behaviorLength === "longer" ? 520 : 420,
-    };
+    return buildCommentPromptSpec(input);
   }
 
   return {
@@ -403,11 +499,26 @@ function buildCommentFallback(input: Extract<ContentGenerationInput, { kind: "co
   const format = input.commentFormat;
 
   if (input.isReply && input.commentExcerpt) {
+    const semantic =
+      input.semanticContext ??
+      extractReplySemanticContext({
+        parentExcerpt: input.commentExcerpt,
+        postExcerpt: input.postExcerpt,
+        threadExcerpts: input.threadExcerpts,
+        varietySeed: input.varietySeed,
+      });
+    const semanticFallback = buildSemanticFallbackReply(semantic, seed);
+    if (semanticFallback) {
+      return semanticFallback;
+    }
+
+    const topic = semantic.reply_target;
     const replyVariants = [
-      `On the ${hook} point — what metric told you it was working?`,
-      `Makes sense. I'd pressure-test the ${hook} assumption before scaling it.`,
-      `Curious how ${authorLabel} handled edge cases around ${hook}.`,
-      `Yeah, though the ${hook} tradeoff can bite you if latency spikes.`,
+      `The ${topic} angle is the part I'd push on — what signal told you it was working?`,
+      `Makes sense on ${topic}. I'd pressure-test that assumption before scaling.`,
+      `Curious how you handled edge cases around ${topic}.`,
+      `Yeah, though the ${topic} tradeoff can bite you if context shifts.`,
+      `Fair point on ${topic} — I'd add one caveat under load.`,
     ];
     return replyVariants[seed % replyVariants.length] ?? replyVariants[0]!;
   }
@@ -440,7 +551,7 @@ function buildCommentFallback(input: Extract<ContentGenerationInput, { kind: "co
       `Timing-wise, ${hook} skills are showing up in a lot of reqs I'm seeing.`,
     ],
     endorsement_style: [
-      `Calling out ${hook} explicitly is harder than it looks — nice that ${authorLabel} didn't gloss over it.`,
+      `Naming ${hook} directly is useful — most people leave that implicit and readers miss it.`,
       `The way ${authorLabel} handled ${hook} is the kind of detail that actually helps readers.`,
     ],
   };
@@ -498,6 +609,110 @@ export class ContentGenerationService {
     } catch {
       return null;
     }
+  }
+
+  private buildCommentQualityOptions(input: Extract<ContentGenerationInput, { kind: "comment" }>) {
+    return { kind: "comment" as const, isShort: input.behaviorLength === "short" };
+  }
+
+  private toGenerationResult(
+    text: string,
+    spec: PromptSpec,
+    qualityOptions: { kind: GeneratedContentKind; isShort?: boolean },
+    provider: ContentGenerationResult["provider"],
+    extraChecks: string[] = [],
+  ): ContentGenerationResult {
+    const quality = evaluateQuality(text, spec.minChars, spec.maxChars, qualityOptions);
+    return {
+      text: text.trim(),
+      confidence: toConfidence(quality.score),
+      checks: [...quality.checks, ...extraChecks],
+      provider,
+    };
+  }
+
+  async generateComment(
+    input: Extract<ContentGenerationInput, { kind: "comment" }>,
+    relevance: ReplyRelevanceInput,
+  ): Promise<ContentGenerationResult> {
+    const qualityOptions = this.buildCommentQualityOptions(input);
+    const semanticContext =
+      relevance.semantic ??
+      (input.isReply && relevance.parentExcerpt
+        ? extractReplySemanticContext({
+            parentExcerpt: relevance.parentExcerpt,
+            postExcerpt: relevance.postExcerpt,
+            threadExcerpts: relevance.threadExcerpts,
+            varietySeed: input.varietySeed,
+          })
+        : null);
+    const enrichedInput = semanticContext ? { ...input, semanticContext } : input;
+    const enrichedRelevance = semanticContext ? { ...relevance, semantic: semanticContext } : relevance;
+
+    const spec = buildCommentPromptSpec(enrichedInput, { semanticContext });
+    const modelText = await this.tryGemini(spec);
+
+    let bestText = modelText ?? buildCommentFallback(enrichedInput);
+    let bestProvider: ContentGenerationResult["provider"] = modelText ? "gemini" : "template_fallback";
+    let bestRelevance = evaluateReplyRelevance({ reply: bestText, ...enrichedRelevance });
+    let extraChecks = bestRelevance.checks;
+
+    if (!bestRelevance.pass && modelText) {
+      const strictSpec = buildCommentPromptSpec(enrichedInput, {
+        strictRelevance: true,
+        semanticContext,
+      });
+      const retryText = await this.tryGemini(strictSpec);
+      if (retryText) {
+        const retryRelevance = evaluateReplyRelevance({ reply: retryText, ...enrichedRelevance });
+        if (retryRelevance.pass || retryRelevance.score > bestRelevance.score) {
+          bestText = retryText;
+          bestProvider = "gemini";
+          bestRelevance = retryRelevance;
+          extraChecks = [...retryRelevance.checks, "relevance_retry"];
+        } else {
+          extraChecks = [...bestRelevance.checks, "relevance_retry_weak"];
+        }
+      }
+    }
+
+    if (!bestRelevance.pass) {
+      const fallbackText = buildCommentFallback(enrichedInput);
+      const fallbackRelevance = evaluateReplyRelevance({ reply: fallbackText, ...enrichedRelevance });
+      if (fallbackRelevance.pass || fallbackRelevance.score >= bestRelevance.score) {
+        bestText = fallbackText;
+        bestProvider = "template_fallback";
+        bestRelevance = fallbackRelevance;
+        extraChecks = [...fallbackRelevance.checks, "relevance_fallback"];
+      }
+    }
+
+    const resultSpec = buildCommentPromptSpec(enrichedInput, { semanticContext });
+    const result = this.toGenerationResult(bestText, resultSpec, qualityOptions, bestProvider, extraChecks);
+
+    if (result.confidence === "low") {
+      const fallbackText = buildCommentFallback(enrichedInput);
+      const fallbackResult = this.toGenerationResult(
+        fallbackText,
+        resultSpec,
+        qualityOptions,
+        "template_fallback",
+        [...extraChecks, "quality_fallback"],
+      );
+      if (fallbackResult.confidence !== "low") {
+        return fallbackResult;
+      }
+      if (
+        enrichedInput.isReply &&
+        semanticContext &&
+        (bestRelevance.checks.includes("surface_anchor") || bestRelevance.checks.includes("paraphrase_weak"))
+      ) {
+        throw new Error("Generated reply failed semantic anchoring checks after fallback.");
+      }
+      throw new Error("Generated comment failed quality checks after relevance guardrails.");
+    }
+
+    return result;
   }
 
   async generate(input: ContentGenerationInput): Promise<ContentGenerationResult> {
