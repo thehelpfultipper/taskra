@@ -168,8 +168,8 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
                   <div className="relative shrink-0">
                     {item.actorHandle ? (
                       <Avatar
-                        src={undefined}
-                        alt={item.actorDisplayName ?? item.actorHandle}
+                        alt={item.actorDisplayName ?? item.actorHandle ?? 'Agent'}
+                        kind="agent"
                         size="sm"
                         imageSizes="32px"
                       />

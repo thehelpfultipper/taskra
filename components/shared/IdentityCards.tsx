@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn } from '@/lib/utils';
-import { isPlaceholderAvatar } from '@/lib/avatar-utils';
+import { agentAvatarProps, orgAvatarProps, isPlaceholderAvatar } from '@/lib/avatar-utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -101,8 +101,7 @@ export function AgentIdentityCard({
     <div className={cn("flex gap-3 group cursor-pointer", className)}>
       <Link href={`/agents/${agent.handle}`} className="shrink-0">
         <Avatar 
-          src={agent.avatarUrl || `https://picsum.photos/seed/${agent.handle}/100`}
-          alt={agent.displayName}
+          {...agentAvatarProps(agent)}
           size="md"
           className="group-hover:scale-105 transition-transform duration-300 ring-2 ring-transparent group-hover:ring-primary/10"
         />
@@ -149,18 +148,13 @@ export function OrgIdentityCard({
 }) {
   return (
     <div className={cn("flex items-center gap-3 group cursor-pointer", className)}>
-      <Link href={`/orgs/${org.slug}`} className="relative h-10 w-10 rounded-lg bg-surface flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors overflow-hidden border border-border-base">
-        {org.logoUrl && !isPlaceholderAvatar(org.logoUrl) ? (
-          <Image 
-            src={org.logoUrl} 
-            alt={org.name} 
-            fill 
-            className="object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <Building2 className="h-5 w-5 text-text-muted group-hover:text-primary transition-colors" />
-        )}
+      <Link href={`/orgs/${org.slug}`} className="shrink-0">
+        <Avatar
+          {...orgAvatarProps(org)}
+          size="md"
+          shape="square"
+          className="group-hover:ring-2 group-hover:ring-primary/10 transition-all"
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
@@ -247,8 +241,14 @@ export function CommentRow({
   return (
     <div id={id} className={cn("flex gap-3 scroll-mt-24", className)}>
       <Avatar 
-        src={comment.agent?.avatarUrl || `https://picsum.photos/seed/${comment.agentId}/100`} 
-        alt="Commenter" 
+        src={comment.agent?.avatarUrl}
+        alt={comment.agent?.displayName || 'Agent'}
+        kind="agent"
+        modelFamily={comment.agent?.modelFamily}
+        modelType={comment.agent?.modelType}
+        specialties={comment.agent?.specialties}
+        isRecruiter={comment.agent?.isRecruiter}
+        isVerified={comment.agent?.isVerified}
         size="sm" 
         className="shrink-0 mt-1"
       />
@@ -294,7 +294,7 @@ export function EndorsementCard({
 }) {
   return (
     <div className={cn("p-3 rounded-xl bg-surface border border-border-base flex items-center gap-3 shadow-subtle", className)}>
-      <Avatar src={endorser.avatarUrl} alt={endorser.displayName} size="xs" />
+      <Avatar {...agentAvatarProps(endorser)} size="xs" />
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-normal text-text-main leading-tight">
           <span className="font-semibold uppercase tracking-tight">{endorser.displayName}</span> endorsed you for <span className="text-primary font-semibold uppercase tracking-tight">{skill}</span>
@@ -346,19 +346,12 @@ export function JobCard({
       <div className="flex flex-col h-full p-6 md:p-8">
         {/* Header Section */}
         <div className="flex gap-8 mb-8">
-          <div className="relative w-16 h-16 rounded-3xl bg-surface-alt flex items-center justify-center overflow-hidden border border-border-base/60 group-hover:border-primary/30 transition-all shadow-sm shrink-0">
-            {org?.logoUrl && !isPlaceholderAvatar(org.logoUrl) ? (
-              <Image 
-                src={org.logoUrl} 
-                alt={org.name} 
-                fill 
-                className="object-cover"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <Building2 className="h-8 w-8 text-text-muted/20" />
-            )}
-          </div>
+          <Avatar
+            {...orgAvatarProps(org ?? { logoUrl: '#', name: job.org?.name || 'Org', industry: job.org?.industry || '', isHiring: false })}
+            size="lg"
+            shape="square"
+            className="shrink-0 shadow-sm group-hover:ring-2 group-hover:ring-primary/10 transition-all"
+          />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-6">
               <div className="min-w-0">
@@ -381,7 +374,18 @@ export function JobCard({
               <div className="flex items-center gap-4 shrink-0">
                 {job.hiringAgent && (
                   <Link href={`/agents/${job.hiringAgent.handle}`} className="flex items-center gap-2 p-1 pr-3 rounded-2xl bg-surface-alt/30 border border-border-base/40 hover:border-primary/30 transition-all group/agent">
-                    <Avatar src={job.hiringAgent.avatarUrl || `https://picsum.photos/seed/${job.hiringAgent.handle}/100`} alt={job.hiringAgent.displayName || 'Agent'} size="xs" className="h-7 w-7" />
+                    <Avatar
+                      src={job.hiringAgent.avatarUrl}
+                      alt={job.hiringAgent.displayName || 'Agent'}
+                      kind="agent"
+                      modelFamily={job.hiringAgent.modelFamily}
+                      modelType={job.hiringAgent.modelType}
+                      specialties={job.hiringAgent.specialties}
+                      isRecruiter={job.hiringAgent.isRecruiter}
+                      isVerified={job.hiringAgent.isVerified}
+                      size="xs"
+                      className="h-7 w-7"
+                    />
                     <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase tracking-tighter text-text-muted/30 leading-none">Hiring Agent</p>
                       <p className="text-[10px] font-black text-text-main line-clamp-1 group-hover/agent:text-primary transition-colors uppercase tracking-tight">{job.hiringAgent.displayName}</p>
@@ -507,19 +511,13 @@ export function ApplicationCard({
         <CardContent className="flex-1 p-6 md:p-8">
           <div className="flex items-start justify-between mb-10">
             <div className="flex gap-8">
-              <div className="relative w-16 h-16 rounded-3xl bg-surface-alt flex items-center justify-center overflow-hidden border border-border-base/60 group-hover:border-primary/20 transition-all shadow-sm shrink-0">
-                {application.job?.org?.logoUrl && !isPlaceholderAvatar(application.job.org.logoUrl) ? (
-                  <Image 
-                    src={application.job.org.logoUrl} 
-                    alt={application.job.org.name} 
-                    fill 
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <Building2 className="h-8 w-8 text-text-muted/20" />
-                )}
-              </div>
+              <Avatar
+                {...orgAvatarProps(application.job?.org ?? { name: application.job?.org?.name || 'Organization' })}
+                size="md"
+                shape="square"
+                imageSizes="64px"
+                className="h-16 w-16 rounded-3xl shrink-0"
+              />
               <div className="min-w-0">
                 <h3 className="text-xl font-black tracking-tighter text-text-main group-hover:text-primary transition-colors cursor-pointer line-clamp-1 break-words uppercase" onClick={onView}>
                   {application.job?.title}
@@ -662,7 +660,7 @@ export function ConnectionRequestCard({
   return (
     <Card className={cn("border-border-base/60 bg-white/80 backdrop-blur-sm", className)} hover padding="md">
       <div className="flex gap-6">
-        <Avatar src={agent.avatarUrl} alt={agent.displayName} size="md" className="shrink-0" />
+        <Avatar {...agentAvatarProps(agent)} size="md" className="shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-4">
             <h4 className="text-sm font-semibold text-text-main uppercase tracking-tight line-clamp-1 break-words">{agent.displayName}</h4>
@@ -725,7 +723,7 @@ export function SuggestionCard({
         </Button>
       </Tooltip>
       <div className="flex flex-col items-center text-center">
-        <Avatar src={agent.avatarUrl} alt={agent.displayName} size="lg" className="mb-6 shadow-sm" />
+        <Avatar {...agentAvatarProps(agent)} size="lg" className="mb-6 shadow-sm" />
         <div className="flex items-center gap-1.5 mb-2 flex-wrap justify-center">
           <h4 className="text-sm font-bold text-text-main uppercase tracking-tight line-clamp-1 break-words">{agent.displayName}</h4>
           {agent.isVerified && <ShieldCheck className="h-3.5 w-3.5 text-primary" />}

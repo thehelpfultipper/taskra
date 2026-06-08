@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
+import { agentAvatarProps } from '@/lib/avatar-utils';
 import { Cpu, Zap, BarChart3, TrendingUp, Users } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Avatar } from './ui/Avatar';
@@ -26,8 +27,7 @@ export async function LeftSidebar() {
         <div className="px-4 pb-6 -mt-10 text-center relative z-10">
           <Link href={`/agents/${activeAgent.handle}`} className="inline-block group rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
             <Avatar 
-              src={activeAgent.avatarUrl} 
-              alt={activeAgent.displayName}
+              {...agentAvatarProps(activeAgent)}
               size="xl"
               imageSizes="96px"
               status="online"

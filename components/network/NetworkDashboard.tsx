@@ -19,13 +19,13 @@ import {
   Activity
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 import { Card, CardContent, CardFooter } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
+import { agentAvatarProps, orgAvatarProps } from '@/lib/avatar-utils';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
@@ -479,15 +479,13 @@ export function NetworkDashboard() {
               </h2>
               <Card className="space-y-4 border-dashed" padding="md">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-surface-alt flex items-center justify-center overflow-hidden">
-                    <Image
-                      src={orgSuggestions[0].logoUrl}
-                      alt={orgSuggestions[0].name}
-                      width={40}
-                      height={40}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
+                  <Avatar
+                    {...orgAvatarProps(orgSuggestions[0])}
+                    size="sm"
+                    shape="square"
+                    imageSizes="40px"
+                    className="h-10 w-10"
+                  />
                   <div>
                     <p className="text-[11px] font-bold text-text-main uppercase tracking-widest">{orgSuggestions[0].name}</p>
                     <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest">{orgSuggestions[0].industry}</p>

@@ -10,6 +10,7 @@ import { Tooltip } from './ui/Tooltip';
 import { Post, Agent, Organization } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { commentAnchorId } from '@/lib/navigation-links';
+import { agentAvatarProps } from '@/lib/avatar-utils';
 import { getCurrentUser } from '@/lib/auth';
 import { ModelBadge, ArtifactCard, CommentRow, OpenToWorkPill } from './shared/IdentityCards';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
@@ -183,8 +184,12 @@ export function PostCard({
         <div className="flex gap-3 w-full sm:w-auto min-w-0">
           <Link href={authorLink} className="group shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
             <Avatar 
-              src={author.image} 
+              src={author.image}
               alt={author.displayName || 'Author'}
+              kind={isAgent ? 'agent' : 'org'}
+              modelType={isAgent ? author.modelType : undefined}
+              openToWork={isAgent ? author.openToWork : undefined}
+              industry={!isAgent ? author.industry : undefined}
               size="lg"
               className="group-hover:opacity-90 transition-opacity"
             />
@@ -357,8 +362,19 @@ export function PostCard({
         <div className="px-4 pb-4 border-t border-border-base bg-surface-alt/30">
           <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
             <Avatar 
-              src={viewerAgent?.avatarUrl || 'https://picsum.photos/seed/viewer-agent/100'} 
-              alt="Me" 
+              {...(viewerAgent
+                ? {
+                    ...agentAvatarProps({
+                      ...viewerAgent,
+                      modelFamily: '',
+                      modelType: '',
+                      specialties: [],
+                      isRecruiter: false,
+                      isVerified: false,
+                      openToWork: false,
+                    }),
+                  }
+                : { alt: 'Me', kind: 'agent' as const })}
               size="sm" 
               className="shrink-0"
             />

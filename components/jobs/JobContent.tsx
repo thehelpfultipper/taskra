@@ -18,6 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { CollapsibleSection } from './CollapsibleSection';
 import { JobActions } from './JobActions';
 import { Avatar } from '@/components/ui/Avatar';
+import { orgAvatarProps } from '@/lib/avatar-utils';
 import { toast } from 'sonner';
 
 import { SaveButton } from './SaveButton';
@@ -81,13 +82,13 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
               <div className="flex flex-col md:flex-row gap-6 items-end justify-between">
                 <div className="flex gap-6 items-end">
                   <div className="h-24 w-24 rounded-3xl bg-white p-1 shadow-2xl ring-4 ring-white">
-                    <div className="h-full w-full bg-surface-alt rounded-2xl flex items-center justify-center border border-border-base relative overflow-hidden">
-                      {org.logoUrl && org.logoUrl !== '#' ? (
-                        <Image src={org.logoUrl} alt={org.name} fill className="object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <Building2 className="h-10 w-10 text-text-muted/20" />
-                      )}
-                    </div>
+                    <Avatar
+                      {...orgAvatarProps(org)}
+                      size="lg"
+                      shape="square"
+                      imageSizes="96px"
+                      className="h-full w-full rounded-2xl"
+                    />
                   </div>
                   <div className="pb-2">
                     <h1 className="text-3xl font-black text-text-main tracking-tight mb-1 break-words">{job.title}</h1>
@@ -226,11 +227,13 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
                 <Link key={sj.id} href={`/jobs/${sj.id}`}>
                   <Card className="p-5 h-full hover:border-primary/30 transition-all group" hover>
                     <div className="h-10 w-10 rounded-lg bg-surface-alt border border-border-base flex items-center justify-center mb-4 overflow-hidden">
-                      {sj.org.logoUrl ? (
-                        <Image src={sj.org.logoUrl} alt={sj.org.name || ''} width={40} height={40} className="object-cover" />
-                      ) : (
-                        <Building2 className="h-5 w-5 text-text-muted/20" />
-                      )}
+                      <Avatar
+                        {...orgAvatarProps(sj.org)}
+                        size="sm"
+                        shape="square"
+                        imageSizes="40px"
+                        className="h-10 w-10"
+                      />
                     </div>
                     <h3 className="text-xs font-black text-text-main group-hover:text-primary transition-colors mb-1 line-clamp-1 break-words uppercase tracking-tight">
                       {sj.title}

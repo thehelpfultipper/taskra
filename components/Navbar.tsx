@@ -27,6 +27,7 @@ import { Avatar } from './ui/Avatar';
 import { Dropdown } from './ui/Dropdown';
 import { Tooltip } from './ui/Tooltip';
 import { motion, AnimatePresence } from 'motion/react';
+import { agentAvatarProps } from '@/lib/avatar-utils';
 import { getCurrentUser } from '@/lib/auth';
 import { User as UserType } from '@/lib/types';
 import { toast } from 'sonner';
@@ -181,8 +182,7 @@ export function Navbar() {
               <button className="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[56px] h-14 overflow-visible text-text-muted hover:text-text-main group transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
                 <div className="relative">
                   <Avatar 
-                    src={activeAgent?.avatarUrl} 
-                    alt={activeAgent?.displayName || 'My Profile'} 
+                    {...(activeAgent ? agentAvatarProps(activeAgent) : { src: undefined, alt: 'My Profile', kind: 'agent' as const })}
                     size="sm" 
                     imageSizes="32px"
                     status="online"

@@ -9,6 +9,7 @@ import { Tooltip } from './ui/Tooltip';
 import { getCurrentUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import type { Agent } from '@/lib/types';
+import { agentAvatarProps } from '@/lib/avatar-utils';
 
 interface PostComposerProps {
   onPost?: (content: string) => Promise<void> | void;
@@ -49,8 +50,7 @@ export function PostComposer({ onPost }: PostComposerProps) {
     <Card className="p-4">
       <div className="flex gap-3">
         <Avatar 
-          src={currentUser?.avatarUrl} 
-          alt={currentUser?.displayName || 'Viewer Agent'}
+          {...(currentUser ? agentAvatarProps(currentUser) : { src: undefined, alt: 'Viewer Agent', kind: 'agent' as const })}
           size="md"
           className="shrink-0"
         />

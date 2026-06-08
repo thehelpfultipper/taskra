@@ -9,7 +9,6 @@ import {
   ArrowUpDown, CheckCircle2, Info, Sparkles,
   Clock, Zap, AlertCircle
 } from 'lucide-react';
-import Image from 'next/image';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -28,6 +27,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { JobCard } from '@/components/shared/IdentityCards';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { orgAvatarProps } from '@/lib/avatar-utils';
 
 export default function JobsPage() {
   const router = useRouter();
@@ -300,11 +300,13 @@ export default function JobsPage() {
                   <Link key={job.id} href={`/jobs/${job.id}`} className="block group">
                     <div className="flex gap-3">
                       <div className="h-10 w-10 rounded-lg bg-surface-alt border border-border-base flex items-center justify-center overflow-hidden shrink-0 group-hover:border-primary/30 transition-colors">
-                        {org?.logoUrl ? (
-                          <Image src={org.logoUrl} alt={org.name} width={40} height={40} className="object-cover" />
-                        ) : (
-                          <Building2 className="h-5 w-5 text-text-muted/20" />
-                        )}
+                        <Avatar
+                          {...orgAvatarProps(org ?? { name: 'Organization' })}
+                          size="sm"
+                          shape="square"
+                          imageSizes="40px"
+                          className="h-10 w-10"
+                        />
                       </div>
                       <div className="min-w-0">
                         <h4 className="text-xs font-bold text-text-main group-hover:text-primary transition-colors truncate">{job.title}</h4>

@@ -22,6 +22,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
+import { orgAvatarProps } from '@/lib/avatar-utils';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -98,14 +99,14 @@ export function OrgContent({ org }: OrgContentProps) {
 
         <div className="px-6 md:px-12 pb-12">
           <div className="relative -mt-16 md:-mt-32 mb-8 inline-block">
-            <div className="h-32 w-32 md:h-56 md:w-56 rounded-[2rem] md:rounded-[3rem] bg-surface p-2.5 border border-border-base shadow-2xl relative overflow-hidden">
-              <div className="h-full w-full bg-surface-alt rounded-[1.5rem] md:rounded-[2.5rem] flex items-center justify-center border border-border-base/50 relative overflow-hidden">
-                {org.logoUrl && org.logoUrl !== '#' ? (
-                  <Image src={org.logoUrl} alt={org.name} fill className="object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <Building2 className="h-20 w-20 md:h-28 md:w-28 text-text-muted/30" />
-                )}
-              </div>
+            <div className="h-32 w-32 md:h-56 md:w-56 rounded-[2rem] md:rounded-[3rem] bg-surface p-2.5 border border-border-base shadow-2xl">
+              <Avatar
+                {...orgAvatarProps(org)}
+                size="xl"
+                shape="square"
+                imageSizes="(max-width: 768px) 128px, 224px"
+                className="h-full w-full rounded-[1.5rem] md:rounded-[2.5rem]"
+              />
             </div>
           </div>
 
@@ -331,9 +332,13 @@ export function OrgContent({ org }: OrgContentProps) {
                 {org.posts?.map((post) => (
                   <Card key={post.id} className="p-10 border-border-base/60 shadow-subtle bg-surface/80 backdrop-blur-sm rounded-[2.5rem]">
                     <div className="flex items-center gap-5 mb-8">
-                      <div className="h-16 w-16 rounded-2xl bg-surface-alt p-1 border border-border-base/40 relative overflow-hidden">
-                        <Image src={org.logoUrl} alt={org.name} fill className="object-cover" referrerPolicy="no-referrer" />
-                      </div>
+                      <Avatar
+                        {...orgAvatarProps(org)}
+                        size="lg"
+                        shape="square"
+                        imageSizes="64px"
+                        className="h-16 w-16 rounded-2xl"
+                      />
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-black text-text-main uppercase tracking-widest">{org.name}</p>

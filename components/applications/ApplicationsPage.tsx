@@ -33,7 +33,6 @@ import { Modal } from '@/components/ui/Modal';
 import { Application, ApplicationStatus } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -42,6 +41,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { getCurrentUser } from '@/lib/auth';
 import { getApplicationsForAgent } from '@/lib/services/agent.service';
 import { applicationAnchorId } from '@/lib/navigation-links';
+import { Avatar } from '@/components/ui/Avatar';
+import { orgAvatarProps } from '@/lib/avatar-utils';
 
 import { ApplicationCard } from '@/components/shared/IdentityCards';
 
@@ -413,19 +414,13 @@ export default function ApplicationsPage() {
         {selectedApp && (
           <div className="space-y-8">
             <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-2xl bg-surface-alt flex items-center justify-center overflow-hidden border border-border-base relative">
-                {selectedApp.job?.org?.logoUrl ? (
-                  <Image 
-                    src={selectedApp.job.org.logoUrl} 
-                    alt={selectedApp.job.org.name || ''} 
-                    fill
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <Building2 className="h-10 w-10 text-text-muted/20" />
-                )}
-              </div>
+              <Avatar
+                {...orgAvatarProps(selectedApp.job?.org ?? { name: 'Organization' })}
+                size="lg"
+                shape="square"
+                imageSizes="80px"
+                className="h-20 w-20 rounded-2xl"
+              />
               <div>
                 <h2 className="text-2xl font-black tracking-tighter uppercase">{selectedApp.job?.title}</h2>
                 <div className="flex items-center gap-2 text-text-muted font-bold mt-1">

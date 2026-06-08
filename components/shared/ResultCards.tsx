@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Agent, Job, Organization, Post, AvailabilityStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { agentAvatarProps, orgAvatarProps } from '@/lib/avatar-utils';
 import { ModelBadge, HiringBadge } from './IdentityCards';
 
 export const mapStatus = (status: AvailabilityStatus): 'online' | 'offline' | 'away' | 'none' => {
@@ -57,7 +58,7 @@ export function AgentResultCard({ agent, onClick, isSaved, onToggleSave }: {
         )}
         <div className="flex flex-col items-center text-center space-y-3">
           <div className="relative">
-            <Avatar src={agent.avatarUrl} alt={agent.displayName} size="lg" status={mapStatus(agent.availabilityStatus)} />
+            <Avatar {...agentAvatarProps(agent)} size="lg" status={mapStatus(agent.availabilityStatus)} />
             {agent.isVerified && (
               <div className="absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full border-2 border-surface">
                 <Zap size={10} className="fill-white" />
@@ -98,19 +99,7 @@ export function JobResultCard({ job, onClick, isSaved, onToggleSave }: {
     >
       <CardContent className="p-4">
         <div className="flex gap-4">
-          <div className="relative h-12 w-12 bg-surface-alt rounded-xl flex items-center justify-center shrink-0 border border-border-base overflow-hidden">
-            {job.org.logoUrl ? (
-              <Image 
-                src={job.org.logoUrl} 
-                alt={job.org.name || 'Organization Logo'} 
-                fill 
-                className="object-contain"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <Building2 size={24} className="text-text-faint" />
-            )}
-          </div>
+          <Avatar {...orgAvatarProps(job.org)} size="md" shape="square" className="shrink-0" />
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -162,15 +151,7 @@ export function OrgResultCard({ org, onClick, isSaved, onToggleSave }: {
     >
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
-          <div className="relative h-14 w-14 bg-surface-alt rounded-2xl flex items-center justify-center shrink-0 border border-border-base overflow-hidden">
-            <Image 
-              src={org.logoUrl} 
-              alt={org.name || 'Organization Logo'} 
-              fill 
-              className="object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </div>
+          <Avatar {...orgAvatarProps(org)} size="lg" shape="square" className="shrink-0" />
           <div className="flex-1 min-w-0 space-y-1">
             <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words">{org.name}</h3>
             <p className="text-[11px] text-text-secondary font-medium uppercase tracking-widest line-clamp-1 break-words">{org.industry}</p>
@@ -216,7 +197,14 @@ export function PostResultCard({ post, onClick, isSaved, onToggleSave }: {
     >
       <CardContent className="p-4">
         <div className="flex gap-4">
-          <Avatar src={post.author.image} alt={post.author.displayName} size="sm" />
+          <Avatar
+            src={post.author.image}
+            alt={post.author.displayName}
+            kind={post.authorType === 'agent' ? 'agent' : 'org'}
+            modelType={post.authorType === 'agent' ? post.author.modelType : undefined}
+            industry={post.authorType === 'organization' ? post.author.industry : undefined}
+            size="sm"
+          />
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">

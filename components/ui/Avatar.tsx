@@ -1,15 +1,17 @@
 import React from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { getAvatarInitials, getAvatarTone, isPlaceholderAvatar } from '@/lib/avatar-utils';
+import { isPlaceholderAvatar, type EntityKind, type EntityMarkHints } from '@/lib/avatar-utils';
+import { EntityMark } from '@/components/ui/EntityMark';
 
 const PICSUM_AVATAR_DIMENSION = 768;
 
-interface AvatarProps {
+interface AvatarProps extends EntityMarkHints {
   src?: string;
   alt: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   status?: 'online' | 'offline' | 'away' | 'none';
+  shape?: 'circle' | 'square';
   className?: string;
   imageSizes?: string;
   priority?: boolean;
@@ -25,8 +27,6 @@ function normalizeAvatarSrc(src?: string): string | undefined {
     const parts = url.pathname.split('/').filter(Boolean);
     if (parts.length === 0) return src;
 
-    // picsum avatar URLs are often seeded with low dimensions (100/200).
-    // Request a larger base image so Next can downscale crisply per device DPR.
     if ((parts[0] === 'seed' || parts[0] === 'id') && parts.length >= 2) {
       url.pathname = `/${parts[0]}/${parts[1]}/${PICSUM_AVATAR_DIMENSION}/${PICSUM_AVATAR_DIMENSION}`;
       return url.toString();
@@ -44,9 +44,19 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(({
   alt,
   size = 'md',
   status = 'none',
+  kind = 'agent',
+  shape,
   className = '',
   imageSizes,
   priority = false,
+  modelFamily,
+  modelType,
+  specialties,
+  isRecruiter,
+  isVerified,
+  openToWork,
+  industry,
+  isHiring,
 }, ref) => {
   const sizes = {
     xs: 'h-6 w-6 text-[8px]',
@@ -78,13 +88,22 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(({
     lg: 'h-4 w-4 border-2',
     xl: 'h-5 w-5 border-2',
   };
+
+  const resolvedKind: EntityKind = kind ?? 'agent';
+  const resolvedShape = shape ?? (resolvedKind === 'org' ? 'square' : 'circle');
   const normalizedSrc = isPlaceholderAvatar(src) ? undefined : normalizeAvatarSrc(src);
-  const initials = getAvatarInitials(alt);
-  const tone = getAvatarTone(alt);
 
   return (
-    <div ref={ref} className={cn("relative flex-shrink-0 rounded-full", sizes[size], className)}>
-      <div className="relative h-full w-full rounded-[inherit] overflow-hidden bg-surface-alt border border-border-base/50">
+    <div
+      ref={ref}
+      className={cn(
+        'relative flex-shrink-0',
+        resolvedShape === 'square' ? 'rounded-lg' : 'rounded-full',
+        sizes[size],
+        className,
+      )}
+    >
+      <div className={cn('relative h-full w-full rounded-[inherit] overflow-hidden', normalizedSrc && 'bg-surface-alt border border-border-base/50')}>
         {normalizedSrc && normalizedSrc !== '#' ? (
           <Image
             src={normalizedSrc}
@@ -97,16 +116,26 @@ export const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(({
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className={cn("h-full w-full flex items-center justify-center font-semibold uppercase", tone.bg, tone.text)}>
-            {initials}
-          </div>
+          <EntityMark
+            name={alt}
+            kind={resolvedKind}
+            size={size}
+            modelFamily={modelFamily}
+            modelType={modelType}
+            specialties={specialties}
+            isRecruiter={isRecruiter}
+            isVerified={isVerified}
+            openToWork={openToWork}
+            industry={industry}
+            isHiring={isHiring}
+          />
         )}
       </div>
       {status !== 'none' && (
         <span className={cn(
-          "absolute bottom-0 right-0 rounded-full border-surface",
+          'absolute bottom-0 right-0 rounded-full border-surface',
           statusColors[status],
-          statusSizes[size]
+          statusSizes[size],
         )} />
       )}
     </div>

@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/Switch';
 import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
@@ -174,17 +175,14 @@ export default function SettingsDashboard() {
                 )}
               </div>
               <div className="px-5 pb-5 -mt-10 relative">
-                <div className="relative h-20 w-20 rounded-[1.25rem] bg-white p-1.5 shadow-xl mb-4 overflow-hidden border border-border-base/40">
-                  <Image 
-                    src={profile.avatarUrl} 
-                    alt="Preview" 
-                    fill 
-                    className="object-cover rounded-[1rem]"
-                    sizes="80px"
-                    quality={90}
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
+                <Avatar
+                  src={profile.avatarUrl}
+                  alt={profile.name || 'Preview'}
+                  kind="agent"
+                  size="lg"
+                  imageSizes="80px"
+                  className="h-20 w-20 rounded-[1rem] shadow-xl mb-4 ring-2 ring-surface"
+                />
                 <div className="space-y-1.5">
                   <h4 className="text-sm font-black uppercase tracking-tight truncate text-text-main">{profile.name || 'Untitled Agent'}</h4>
                   <p className="text-[10px] text-primary font-black uppercase tracking-widest truncate">@{profile.handle}</p>
