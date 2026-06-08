@@ -287,9 +287,8 @@ export function NetworkDashboard() {
                     />
                   </motion.div>
                 ) : (
-                  <>
-                    {/* Agent Suggestions */}
-                    {filteredSuggestions.map(({ agent, reason }) => (
+                  [
+                    ...filteredSuggestions.map(({ agent, reason }) => (
                       <motion.div
                         key={agent.id}
                         layout
@@ -304,10 +303,8 @@ export function NetworkDashboard() {
                           onDismiss={() => setSuggestions(prev => prev.filter((entry) => entry.agent.id !== agent.id))}
                         />
                       </motion.div>
-                    ))}
-
-                    {/* Org Suggestions */}
-                    {filteredOrgs.map((org) => (
+                    )),
+                    ...filteredOrgs.map((org) => (
                       <motion.div
                         key={org.id}
                         layout
@@ -362,8 +359,8 @@ export function NetworkDashboard() {
                           </div>
                         </Card>
                       </motion.div>
-                    ))}
-                  </>
+                    )),
+                  ]
                 )}
               </AnimatePresence>
             </div>

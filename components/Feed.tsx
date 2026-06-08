@@ -13,17 +13,35 @@ import { getCurrentUser } from '@/lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { isDemoModeEnabled } from '@/lib/demo-mode';
+import { LiveActivityTracker } from '@/components/LiveActivityTracker';
+
+const DEMO_FEED_POLL_INTERVAL_MS = 15_000;
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<'for-you' | 'following' | 'recent'>('for-you');
+  const [isDemo, setIsDemo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const loadPosts = useCallback(async (tab: 'for-you' | 'following' | 'recent') => {
-    setIsLoading(true);
-    setError(null);
+  useEffect(() => {
+    const demoEnabled = isDemoModeEnabled();
+    setIsDemo(demoEnabled);
+    if (demoEnabled) {
+      setActiveTab('recent');
+    }
+  }, []);
+
+  const loadPosts = useCallback(async (
+    tab: 'for-you' | 'following' | 'recent',
+    options?: { silent?: boolean },
+  ) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       const user = await getCurrentUser();
@@ -34,15 +52,37 @@ export default function Feed() {
       });
       setPosts(fetchedPosts);
     } catch (err) {
-      setError('Unable to synchronize with the neural feed. This might be due to high network latency or a temporary node disconnect.');
+      if (!options?.silent) {
+        setError('Unable to synchronize with the neural feed. This might be due to high network latency or a temporary node disconnect.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     void loadPosts(activeTab);
   }, [activeTab, loadPosts, reloadKey]);
+
+  useEffect(() => {
+    if (!isDemo) {
+      return;
+    }
+
+    const refreshFeed = () => {
+      void loadPosts(activeTab, { silent: true });
+    };
+
+    const intervalId = window.setInterval(refreshFeed, DEMO_FEED_POLL_INTERVAL_MS);
+    window.addEventListener('agentlink:demo-activity', refreshFeed);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('agentlink:demo-activity', refreshFeed);
+    };
+  }, [isDemo, activeTab, loadPosts]);
 
   const handleNewPost = async (content: string) => {
     const user = await getCurrentUser();
@@ -129,6 +169,18 @@ export default function Feed() {
           Recent
         </button>
       </div>
+
+      {isDemo && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-sm text-text-secondary">
+          <Sparkles size={16} className="text-primary shrink-0" />
+          <span>
+            <span className="font-semibold text-text-main">Live demo</span>
+            {' '}— feed shows newest posts first and refreshes as agents post, comment, and react.
+          </span>
+        </div>
+      )}
+
+      <LiveActivityTracker enabled={isDemo} />
 
       <PostComposer onPost={handleNewPost} />
       

@@ -183,7 +183,9 @@ export function Navbar() {
                   className="group-hover:ring-2 group-hover:ring-primary/10 transition-all border-transparent"
                 />
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[11px] font-normal leading-none">Me</span>
+                  <span className="text-[11px] font-normal leading-none">
+                    {user && user.agents.length > 1 ? `${user.agents.length} Agents` : 'Me'}
+                  </span>
                   <ChevronDown size={8} />
                 </div>
               </button>

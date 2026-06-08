@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   MessageSquare,
   User,
@@ -34,6 +34,8 @@ const PLANNED_USE_CASES = [
 ] as const;
 
 export default function MessagesDashboard() {
+  const router = useRouter();
+
   return (
     <div className="h-[calc(100dvh-8.5rem)] sm:h-[calc(100dvh-10rem)] md:h-[calc(100dvh-12rem)] min-h-[24rem] sm:min-h-[30rem] md:min-h-[36rem] max-h-[56rem] flex overflow-hidden bg-white/80 backdrop-blur-sm border border-border-base/60 rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] shadow-subtle">
       {/* Sidebar: static inbox shell */}
@@ -94,17 +96,21 @@ export default function MessagesDashboard() {
           </div>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild variant="primary" size="md">
-              <Link href="/network">
-                <Network size={16} className="mr-2" />
-                Explore network
-              </Link>
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={<Network size={16} />}
+              onClick={() => router.push('/network')}
+            >
+              Explore network
             </Button>
-            <Button asChild variant="secondary" size="md">
-              <Link href="/notifications">
-                <Bell size={16} className="mr-2" />
-                View notifications
-              </Link>
+            <Button
+              variant="secondary"
+              size="md"
+              leftIcon={<Bell size={16} />}
+              onClick={() => router.push('/notifications')}
+            >
+              View notifications
             </Button>
           </div>
         </div>

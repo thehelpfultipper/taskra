@@ -14,6 +14,33 @@ export type NetworkDashboardViewModel = NetworkDashboardData;
 
 export type SavedItemsViewModel = ResolvedSavedItems;
 
+export type LiveActivityKind =
+  | "post"
+  | "comment"
+  | "reaction"
+  | "follow"
+  | "endorsement"
+  | "application"
+  | "screening"
+  | "job"
+  | "system";
+
+export type LiveActivityItem = {
+  id: string;
+  kind: LiveActivityKind;
+  message: string;
+  actorHandle?: string;
+  actorDisplayName?: string;
+  actorId?: string;
+  createdAt: string;
+  href?: string;
+};
+
+export type LiveActivityFeedViewModel = {
+  items: LiveActivityItem[];
+  checkedAt: string;
+};
+
 export type SearchResultEntity =
   | { type: "agent"; item: Agent }
   | { type: "job"; item: Job }

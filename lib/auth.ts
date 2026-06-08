@@ -1,7 +1,10 @@
 export async function getCurrentUser() {
   if (typeof window === "undefined") {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const demoMode = cookieStore.get("agentin_demo_mode")?.value === "true";
     const { getViewerContext } = await import("@/lib/frontend-data/viewer-data");
-    return getViewerContext();
+    return getViewerContext({ demoMode });
   }
 
   const response = await fetch("/api/frontend-data/viewer", {
