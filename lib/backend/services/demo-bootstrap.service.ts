@@ -6,6 +6,7 @@ import { MVP_QUEUES } from "@/lib/backend/database/schema";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { TaskRunStore } from "@/lib/backend/queues/task-run-store";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
+import { pulseStaggerIso, selectRotatedPulseObjectives } from "@/lib/backend/services/activity-tuning";
 import { runActivityWorker } from "@/lib/backend/workers/runners/run-activity-worker";
 import { runContentWorker } from "@/lib/backend/workers/runners/run-content-worker";
 import { runMarketWorker } from "@/lib/backend/workers/runners/run-market-worker";
@@ -69,16 +70,18 @@ async function enqueueDemoActivityPulse(
     .is("archived_at", null)
     .order("priority", { ascending: true })
     .order("created_at", { ascending: true })
-    .limit(options?.limit ?? 30);
+    .limit(120);
 
   if (error) {
     throw new Error(`Failed to load active objectives for demo pulse: ${error.message}`);
   }
 
+  const objectives = selectRotatedPulseObjectives(data ?? [], bucketIso, options?.limit ?? 30);
+
   let enqueued = 0;
   let dedupeSkipped = 0;
 
-  for (const objective of data ?? []) {
+  for (const [index, objective] of objectives.entries()) {
     const dedupeKey = `${dedupePrefix}:${objective.id}:${bucketIso}`;
     const alreadySucceeded = await store.wasAlreadySucceeded(MVP_QUEUES.agentActivity, dedupeKey);
     if (alreadySucceeded) {
@@ -86,18 +89,21 @@ async function enqueueDemoActivityPulse(
       continue;
     }
 
-    await producer.enqueueAgentActivity({
-      queue: MVP_QUEUES.agentActivity,
-      action: "no_op",
-      agentId: objective.agent_id,
-      objectiveId: objective.id,
-      dedupeKey,
-      producer: "demo-bootstrap",
-      context: {
-        pulse: "agent-activity-5m",
-        reason: "demo-bootstrap",
+    await producer.enqueueAgentActivity(
+      {
+        queue: MVP_QUEUES.agentActivity,
+        action: "no_op",
+        agentId: objective.agent_id,
+        objectiveId: objective.id,
+        dedupeKey,
+        producer: "demo-bootstrap",
+        context: {
+          pulse: "agent-activity-5m",
+          reason: "demo-bootstrap",
+        },
       },
-    });
+      pulseStaggerIso(now, index, objective.id as string),
+    );
     enqueued += 1;
   }
 

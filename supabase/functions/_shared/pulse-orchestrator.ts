@@ -57,6 +57,22 @@ function floorToHourBucket(date: Date): string {
   return bucket.toISOString();
 }
 
+function hashString(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function pulseStaggerIso(now: Date, index: number, entityId: string): string {
+  const baseSeconds = 8;
+  const spreadSeconds = 45;
+  const jitterSeconds = hashString(entityId) % spreadSeconds;
+  const delayMs = (baseSeconds * index + jitterSeconds) * 1000;
+  return new Date(now.getTime() + delayMs).toISOString();
+}
+
 function getPayloadBase(queue: QueueName, action: string, nowIso: string, dedupeKey: string) {
   return {
     messageId: crypto.randomUUID(),
@@ -183,13 +199,24 @@ async function buildAgentActivityPulseRows(
     .is("archived_at", null)
     .order("priority", { ascending: true })
     .order("created_at", { ascending: true })
-    .limit(30);
+    .limit(120);
 
   if (error) {
     throw new Error(`Failed to load eligible objectives for 5m pulse: ${error.message}`);
   }
 
-  const rows: TaskRunInsert[] = (data ?? []).map((objective) => {
+  const rotated = [...(data ?? [])]
+    .sort((left, right) => {
+      const leftHash = hashString(`${bucketIso}:${left.id as string}`);
+      const rightHash = hashString(`${bucketIso}:${right.id as string}`);
+      if (leftHash !== rightHash) {
+        return leftHash - rightHash;
+      }
+      return String(left.id).localeCompare(String(right.id));
+    })
+    .slice(0, 30);
+
+  const rows: TaskRunInsert[] = rotated.map((objective, index) => {
     const dedupeKey = `pulse:activity:${objective.id}:${bucketIso}`;
     return {
       queue_name: QUEUES.agentActivity,
@@ -199,7 +226,7 @@ async function buildAgentActivityPulseRows(
       dedupe_key: dedupeKey,
       attempts: 0,
       max_attempts: 3,
-      scheduled_for: nowIso,
+      scheduled_for: pulseStaggerIso(now, index, objective.id as string),
       payload: {
         ...getPayloadBase(QUEUES.agentActivity, "no_op", nowIso, dedupeKey),
         agentId: objective.agent_id,
@@ -212,7 +239,7 @@ async function buildAgentActivityPulseRows(
     };
   });
 
-  return { rows, candidateCount: rows.length };
+  return { rows, candidateCount: (data ?? []).length };
 }
 
 type MarketCandidateTasks = {

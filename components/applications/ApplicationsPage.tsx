@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   Search, 
   Clock, 
@@ -40,6 +41,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getCurrentUser } from '@/lib/auth';
 import { getApplicationsForAgent } from '@/lib/services/agent.service';
+import { applicationAnchorId } from '@/lib/navigation-links';
 
 import { ApplicationCard } from '@/components/shared/IdentityCards';
 
@@ -56,6 +58,8 @@ const statusConfig = {
 type SortOption = 'newest' | 'oldest' | 'company' | 'status';
 
 export default function ApplicationsPage() {
+  const searchParams = useSearchParams();
+  const targetApplicationId = searchParams.get('application');
   const [applications, setApplications] = useState<Application[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
@@ -64,6 +68,8 @@ export default function ApplicationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [highlightedApplicationId, setHighlightedApplicationId] = useState<string | null>(null);
+  const deepLinkHandledRef = useRef<string | null>(null);
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -105,6 +111,51 @@ export default function ApplicationsPage() {
 
     void loadData();
   }, [reloadKey]);
+
+  useEffect(() => {
+    if (!targetApplicationId) {
+      return;
+    }
+    setHighlightedApplicationId(targetApplicationId);
+    setActiveTab('all');
+    deepLinkHandledRef.current = null;
+  }, [targetApplicationId]);
+
+  useEffect(() => {
+    if (!targetApplicationId || isLoading) {
+      return;
+    }
+
+    let highlightTimeoutId: number | undefined;
+    const match = applications.find((app) => app.id === targetApplicationId);
+
+    if (!match) {
+      toast.info('That application is not in your deployment log.');
+      return;
+    }
+
+    if (deepLinkHandledRef.current === targetApplicationId) {
+      return;
+    }
+    deepLinkHandledRef.current = targetApplicationId;
+
+    window.requestAnimationFrame(() => {
+      document.getElementById(applicationAnchorId(targetApplicationId))?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+
+    highlightTimeoutId = window.setTimeout(() => {
+      setHighlightedApplicationId((current) => (current === targetApplicationId ? null : current));
+    }, 4000);
+
+    return () => {
+      if (highlightTimeoutId !== undefined) {
+        window.clearTimeout(highlightTimeoutId);
+      }
+    };
+  }, [targetApplicationId, isLoading, applications]);
 
   const filteredAndSortedApplications = useMemo(() => {
     let result = applications.filter(app => {
@@ -286,11 +337,16 @@ export default function ApplicationsPage() {
             filteredAndSortedApplications.map((app) => (
               <motion.div
                 key={app.id}
+                id={applicationAnchorId(app.id)}
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
+                className={cn(
+                  'rounded-2xl transition-shadow duration-500',
+                  highlightedApplicationId === app.id && 'ring-2 ring-primary/50 shadow-lg shadow-primary/10',
+                )}
               >
                 <ApplicationCard 
                   application={app} 
@@ -301,6 +357,20 @@ export default function ApplicationsPage() {
                 />
               </motion.div>
             ))
+          ) : applications.length === 0 ? (
+            <div className="py-12">
+              <EmptyState
+                icon={FileText}
+                title="No deployments yet"
+                description="This log tracks job applications submitted by your managed agents. Browse open roles and apply to start building a pipeline."
+                action={{
+                  label: "Browse open deployments",
+                  onClick: () => {
+                    window.location.href = '/jobs';
+                  },
+                }}
+              />
+            </div>
           ) : (
             <div className="py-12">
               <EmptyState

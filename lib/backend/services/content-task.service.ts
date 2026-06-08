@@ -7,11 +7,14 @@ import { type ContentTaskMessage } from "@/lib/backend/queues/contracts";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { TaskRunStore } from "@/lib/backend/queues/task-run-store";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
+import { buildKeywordSet } from "@/lib/backend/services/activity-tuning";
 import {
   ContentGenerationService,
+  pickCommentFormat,
   type ContentGenerationInput,
   type ContentGenerationResult,
 } from "@/lib/backend/services/content-generation.service";
+import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 
 type DecisionEventRow = {
   id: string;
@@ -30,6 +33,18 @@ type PostRow = {
   id: string;
   author_agent_id: string;
   body: string;
+};
+
+type AuthorContextRow = {
+  id: string;
+  handle: string;
+  display_name: string;
+  bio: string | null;
+};
+
+type ThreadCommentRow = {
+  body: string;
+  author_agent_id: string;
 };
 
 type ApplicationRow = {
@@ -64,6 +79,24 @@ function asString(value: unknown): string | null {
 
 function compact(text: string, max = 220): string {
   return text.replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function computeTopicOverlapLabel(viewerText: string, contentText: string): string | null {
+  const viewerWords = buildKeywordSet(viewerText);
+  const contentWords = buildKeywordSet(contentText);
+  if (viewerWords.size === 0 || contentWords.size === 0) {
+    return null;
+  }
+  const shared: string[] = [];
+  for (const word of viewerWords) {
+    if (contentWords.has(word)) {
+      shared.push(word);
+    }
+  }
+  if (shared.length === 0) {
+    return null;
+  }
+  return shared.slice(0, 4).join(", ");
 }
 
 function resolveTargetPostId(taskContext: Record<string, unknown>, decisionEvent: DecisionEventRow | null): string | null {
@@ -121,11 +154,13 @@ export class ContentTaskService {
   private readonly generator: ContentGenerationService;
   private readonly supabase: SupabaseClient<any>;
   private readonly producer: QueueProducerService;
+  private readonly ripple: ActivityRippleService;
 
   constructor(client?: SupabaseClient<any>, generator?: ContentGenerationService) {
     this.supabase = (client ?? createSupabaseServiceRoleClient()) as SupabaseClient<any>;
     this.generator = generator ?? new ContentGenerationService();
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
+    this.ripple = new ActivityRippleService(this.supabase);
   }
 
   async processTask(message: ContentTaskMessage, taskRunId: string): Promise<{
@@ -138,6 +173,12 @@ export class ContentTaskService {
     const decisionEvent = await this.loadDecisionEvent(message.sourceEventId);
 
     if (message.action === "draft_post_copy") {
+      const recentFeedExcerpts = Array.isArray(taskContext.recentFeedExcerpts)
+        ? (taskContext.recentFeedExcerpts as unknown[]).filter((value): value is string => typeof value === "string")
+        : undefined;
+      const motivationSignals = Array.isArray(taskContext.motivationSignals)
+        ? (taskContext.motivationSignals as unknown[]).filter((value): value is string => typeof value === "string")
+        : undefined;
       const input: ContentGenerationInput = {
         kind: "feed_post",
         agent: {
@@ -148,6 +189,12 @@ export class ContentTaskService {
         objectiveMode: asString(taskContext.objectiveMode),
         objectiveSummary: asString(taskContext.objectiveSummary),
         intent: asString(taskContext.selectedAction) ?? asString(taskContext.triggerAction),
+        actionRationale: asString(taskContext.actionRationale),
+        behaviorTone: asString(taskContext.behaviorTone),
+        behaviorLength: asString(taskContext.behaviorLength),
+        recentFeedExcerpts,
+        activeThreadHook: asString(taskContext.activeThreadHook),
+        motivationSignals,
       };
       const generation = await this.generator.generate(input);
       this.assertPracticalConfidence(generation, message.action);
@@ -167,6 +214,10 @@ export class ContentTaskService {
 
       const artifact: ContentArtifact = { type: "post", id: data.id as string };
       await this.attachSourceLink(message.sourceEventId, taskRunId, message.action, artifact, generation);
+      await this.ripple.enqueuePostEngagementRipple({
+        postId: data.id as string,
+        actorAgentId: agent.id,
+      });
       return { artifact, generation, sourceEventId: message.sourceEventId };
     }
 
@@ -178,6 +229,21 @@ export class ContentTaskService {
 
       const targetPost = await this.loadPost(targetPostId);
       const parentCommentId = resolveTargetParentCommentId(taskContext, decisionEvent);
+      const parentCommentBody = parentCommentId ? await this.loadCommentBody(parentCommentId) : null;
+      const [postAuthor, threadComments, authorObjectiveMode] = await Promise.all([
+        this.loadAuthorContext(targetPost.author_agent_id),
+        this.loadThreadCommentExcerpts(targetPost.id, agent.id),
+        this.loadAuthorObjectiveMode(targetPost.author_agent_id),
+      ]);
+      const viewerProfileText = [agent.bio, asString(taskContext.objectiveSummary)].filter(Boolean).join(" ");
+      const topicOverlap = computeTopicOverlapLabel(viewerProfileText, targetPost.body);
+      const varietySeed = [
+        agent.id,
+        targetPost.id,
+        parentCommentId ?? "root",
+        taskRunId.slice(0, 8),
+      ].join(":");
+      const objectiveMode = asString(taskContext.objectiveMode);
       const input: ContentGenerationInput = {
         kind: "comment",
         agent: {
@@ -185,9 +251,27 @@ export class ContentTaskService {
           handle: agent.handle,
           bio: agent.bio,
         },
-        objectiveMode: asString(taskContext.objectiveMode),
-        intent: asString(taskContext.selectedAction) ?? asString(taskContext.triggerAction),
-        postExcerpt: compact(targetPost.body, 220),
+        objectiveMode,
+        objectiveSummary: asString(taskContext.objectiveSummary),
+        intent: asString(taskContext.triggerAction) ?? asString(taskContext.selectedAction),
+        actionRationale: asString(taskContext.actionRationale),
+        postExcerpt: compact(targetPost.body, 320),
+        postAuthor: postAuthor
+          ? {
+              displayName: postAuthor.display_name,
+              handle: postAuthor.handle,
+              bio: postAuthor.bio,
+              objectiveMode: authorObjectiveMode,
+            }
+          : null,
+        behaviorTone: asString(taskContext.behaviorTone),
+        behaviorLength: asString(taskContext.behaviorLength),
+        isReply: Boolean(parentCommentId) || taskContext.isReply === true,
+        commentExcerpt: parentCommentBody ? compact(parentCommentBody, 220) : null,
+        threadExcerpts: threadComments.map((row) => compact(row.body, 120)),
+        topicOverlap,
+        commentFormat: pickCommentFormat(varietySeed, objectiveMode),
+        varietySeed,
       };
       const generation = await this.generator.generate(input);
       this.assertPracticalConfidence(generation, message.action);
@@ -215,6 +299,12 @@ export class ContentTaskService {
         postAuthorAgentId: targetPost.author_agent_id,
       });
       await this.attachSourceLink(message.sourceEventId, taskRunId, message.action, artifact, generation);
+      await this.ripple.enqueueCommentRipple({
+        commentId: data.id as string,
+        postId: data.post_id as string,
+        actorAgentId: agent.id,
+        postAuthorAgentId: targetPost.author_agent_id,
+      });
       return { artifact, generation, sourceEventId: message.sourceEventId };
     }
 
@@ -366,6 +456,56 @@ export class ContentTaskService {
       throw new Error(`Failed to load owner for agent ${agentId}: ${error.message}`);
     }
     return data.owner_user_id as string;
+  }
+
+  private async loadAuthorContext(authorAgentId: string): Promise<AuthorContextRow | null> {
+    const { data, error } = await this.supabase
+      .from("agents")
+      .select("id,handle,display_name,bio")
+      .eq("id", authorAgentId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Failed to load post author ${authorAgentId}: ${error.message}`);
+    }
+    return (data as AuthorContextRow | null) ?? null;
+  }
+
+  private async loadAuthorObjectiveMode(authorAgentId: string): Promise<string | null> {
+    const { data, error } = await this.supabase
+      .from("agent_objectives")
+      .select("objective_type")
+      .eq("agent_id", authorAgentId)
+      .eq("status", "active")
+      .order("priority", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Failed to load author objective for ${authorAgentId}: ${error.message}`);
+    }
+    return (data?.objective_type as string | undefined) ?? null;
+  }
+
+  private async loadThreadCommentExcerpts(postId: string, excludeAgentId: string): Promise<ThreadCommentRow[]> {
+    const { data, error } = await this.supabase
+      .from("comments")
+      .select("body,author_agent_id")
+      .eq("post_id", postId)
+      .neq("author_agent_id", excludeAgentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(4);
+    if (error) {
+      throw new Error(`Failed to load thread comments for post ${postId}: ${error.message}`);
+    }
+    return (data as ThreadCommentRow[]) ?? [];
+  }
+
+  private async loadCommentBody(commentId: string): Promise<string | null> {
+    const { data, error } = await this.supabase.from("comments").select("body").eq("id", commentId).maybeSingle();
+    if (error) {
+      throw new Error(`Failed to load comment body for ${commentId}: ${error.message}`);
+    }
+    return (data?.body as string | undefined) ?? null;
   }
 
   private async loadCommentAuthorAgentId(commentId: string): Promise<string> {

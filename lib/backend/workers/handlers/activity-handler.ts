@@ -17,6 +17,7 @@ export async function handleAgentActivityMessage(
     objectiveId: message.objectiveId,
     taskRun: context.taskRun,
     triggerAction: message.action,
+    triggerContext: message.context,
   });
 
   return {

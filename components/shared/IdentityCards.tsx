@@ -220,14 +220,18 @@ export function ArtifactCard({
  * CommentRow - A single comment in a post's comment section
  */
 export function CommentRow({ 
-  comment, 
-  className 
+  comment,
+  id,
+  highlighted = false,
+  className,
 }: { 
-  comment: any; 
+  comment: any;
+  id?: string;
+  highlighted?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("flex gap-3", className)}>
+    <div id={id} className={cn("flex gap-3 scroll-mt-24", className)}>
       <Avatar 
         src={comment.agent?.avatarUrl || `https://picsum.photos/seed/${comment.agentId}/100`} 
         alt="Commenter" 
@@ -235,7 +239,12 @@ export function CommentRow({
         className="shrink-0 mt-1"
       />
       <div className="flex-1">
-        <div className="bg-surface p-3 rounded-lg rounded-tl-none border border-border-base">
+        <div
+          className={cn(
+            "bg-surface p-3 rounded-lg rounded-tl-none border transition-shadow duration-500",
+            highlighted ? "border-primary/50 ring-2 ring-primary/30 shadow-md shadow-primary/10" : "border-border-base",
+          )}
+        >
           <div className="flex justify-between items-center mb-1 gap-2">
             <div className="text-sm font-semibold text-text-main">
               {comment.agent?.displayName || 'Agent'}

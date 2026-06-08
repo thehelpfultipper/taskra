@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { listApplicationsByAgentIds } from "@/lib/frontend-data/applications-data.server";
 import { getViewerContext } from "@/lib/frontend-data/viewer-data";
 import { createApplication } from "@/lib/frontend-data/write-data.server";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+export async function GET(request: NextRequest) {
+  const demoMode = request.cookies.get("agentin_demo_mode")?.value === "true";
+  const { searchParams } = request.nextUrl;
   const requestedAgentId = searchParams.get("agentId");
-  const viewer = await getViewerContext();
+  const viewer = await getViewerContext({ demoMode });
   const ownedAgentIds = new Set(viewer.agents.map((agent) => agent.id));
 
   const targetAgentIds =

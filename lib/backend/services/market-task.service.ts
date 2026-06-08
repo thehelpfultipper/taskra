@@ -7,6 +7,7 @@ import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { type MarketTaskMessage } from "@/lib/backend/queues/contracts";
 import { TaskRunStore, type TaskRunRecord } from "@/lib/backend/queues/task-run-store";
 import { CredibilityService } from "@/lib/backend/services/credibility.service";
+import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 import { SafetyRailsService } from "@/lib/backend/services/safety-rails.service";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 
@@ -117,11 +118,13 @@ export class MarketTaskService {
   private readonly producer: QueueProducerService;
   private readonly credibility: CredibilityService;
   private readonly safetyRails: SafetyRailsService;
+  private readonly ripple: ActivityRippleService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
     this.credibility = new CredibilityService(this.supabase);
     this.safetyRails = new SafetyRailsService(this.supabase);
+    this.ripple = new ActivityRippleService(this.supabase);
   }
 
   async processTask(
@@ -454,6 +457,19 @@ export class MarketTaskService {
       });
     }
     await this.credibility.refreshAgent(application.applicant_agent_id);
+
+    if (screening.nextStatus === "shortlisted") {
+      await this.enqueueHiringFollowUpActivity({
+        recruiterAgentId: recruiterAgent.id,
+        applicantAgentId: application.applicant_agent_id,
+        applicationId: application.id,
+      });
+      await this.ripple.enqueueHiringDiscussionRipple({
+        recruiterAgentId: recruiterAgent.id,
+        applicantAgentId: application.applicant_agent_id,
+        applicationId: application.id,
+      });
+    }
 
     await this.persistDecisionEvent({
       taskRun,
@@ -878,6 +894,54 @@ export class MarketTaskService {
     }
     const text = asString(data.cover_note) ?? "";
     return text.length;
+  }
+
+  private async enqueueHiringFollowUpActivity(input: {
+    recruiterAgentId: string;
+    applicantAgentId: string;
+    applicationId: string;
+  }): Promise<void> {
+    const objectiveId = await this.loadPrimaryObjectiveId(input.recruiterAgentId);
+    if (!objectiveId) {
+      return;
+    }
+
+    const scheduledFor = new Date(Date.now() + 75 * 1000).toISOString();
+    await this.producer.enqueueAgentActivity(
+      {
+        queue: MVP_QUEUES.agentActivity,
+        action: "no_op",
+        agentId: input.recruiterAgentId,
+        objectiveId,
+        dedupeKey: `market:hiring-follow-up:${input.applicationId}`,
+        producer: "market-task",
+        context: {
+          trigger: "hiring_follow_up",
+          hiringFollowUp: {
+            applicantAgentId: input.applicantAgentId,
+            applicationId: input.applicationId,
+          },
+        },
+      },
+      scheduledFor,
+    );
+  }
+
+  private async loadPrimaryObjectiveId(agentId: string): Promise<string | null> {
+    const { data, error } = await this.supabase
+      .from("agent_objectives")
+      .select("id")
+      .eq("agent_id", agentId)
+      .eq("status", "active")
+      .is("archived_at", null)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Failed to load objective for ${agentId}: ${error.message}`);
+    }
+    return (data?.id as string | undefined) ?? null;
   }
 
   private async persistDecisionEvent(input: {

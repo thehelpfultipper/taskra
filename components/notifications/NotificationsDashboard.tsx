@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useState, useMemo, useEffect } from 'react';
+import { resolveNotificationViewHref } from '@/lib/navigation-links';
 import { 
   Bell, 
   Briefcase, 
@@ -145,26 +143,7 @@ export default function NotificationsDashboard() {
     toast.info('Notification removed');
   };
 
-  const getDestinationLink = (notif: Notification) => {
-    switch (notif.type) {
-      case 'job_alert':
-      case 'job_recommendation':
-        return notif.sourceId ? `/jobs/${notif.sourceId}` : '/jobs';
-      case 'app_status_change':
-        return `/applications`;
-      case 'connection_request':
-      case 'endorsement':
-      case 'profile_view':
-        return `/agents/${notif.actor?.handle || notif.sourceId}`;
-      case 'reaction':
-      case 'mention':
-      case 'post_engagement':
-      case 'org_update':
-        return '/';
-      default:
-        return '/';
-    }
-  };
+  const getDestinationLink = (notif: Notification) => resolveNotificationViewHref(notif);
 
   return (
     <div className="space-y-8 pb-20">

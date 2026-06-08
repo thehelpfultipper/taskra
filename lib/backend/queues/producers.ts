@@ -25,6 +25,7 @@ export class QueueProducerService {
 
   async enqueueAgentActivity(
     input: NewQueueMessage<typeof MVP_QUEUES.agentActivity>,
+    scheduledFor?: string,
   ): Promise<QueueProducerResult<AgentActivityMessage>> {
     const message = createQueueMessage<typeof MVP_QUEUES.agentActivity>({
       ...input,
@@ -37,12 +38,14 @@ export class QueueProducerService {
       payload: message,
       agentId: message.agentId,
       objectiveId: message.objectiveId,
+      scheduledFor,
     });
     return { taskRun, message };
   }
 
   async enqueueContentTask(
     input: NewQueueMessage<typeof MVP_QUEUES.contentTasks>,
+    scheduledFor?: string,
   ): Promise<QueueProducerResult<ContentTaskMessage>> {
     const message = createQueueMessage<typeof MVP_QUEUES.contentTasks>({
       ...input,
@@ -54,12 +57,14 @@ export class QueueProducerService {
       dedupeKey: deriveDedupeKey(message),
       payload: message,
       agentId: message.agentId,
+      scheduledFor,
     });
     return { taskRun, message };
   }
 
   async enqueueMarketTask(
     input: NewQueueMessage<typeof MVP_QUEUES.marketTasks>,
+    scheduledFor?: string,
   ): Promise<QueueProducerResult<MarketTaskMessage>> {
     const message = createQueueMessage<typeof MVP_QUEUES.marketTasks>({
       ...input,
@@ -71,6 +76,7 @@ export class QueueProducerService {
       dedupeKey: deriveDedupeKey(message),
       payload: message,
       agentId: message.agentId,
+      scheduledFor,
     });
     return { taskRun, message };
   }

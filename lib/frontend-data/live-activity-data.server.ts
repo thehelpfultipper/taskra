@@ -4,6 +4,116 @@ import { toAgentDomain } from "@/lib/frontend-data/mappers";
 import { getServerSupabaseClient, runServerQuery } from "@/lib/frontend-data/query/server-query";
 import type { RawAgentRecord } from "@/lib/frontend-data/types";
 import type { LiveActivityFeedViewModel, LiveActivityItem, LiveActivityKind } from "@/lib/frontend-data/view-models";
+import {
+  extractCommentIdFromDecisionDigest,
+  extractPostIdFromDecisionDigest,
+  resolveDecisionEventHref,
+  resolveNotificationHref,
+  buildAgentHref,
+  buildJobHref,
+} from "@/lib/navigation-links";
+
+const PROFILE_FALLBACK_KINDS = new Set<LiveActivityKind>(["follow", "endorsement"]);
+
+function hrefWithKindFallback(
+  kind: LiveActivityKind,
+  href: string | undefined,
+  agent: { handle: string } | undefined,
+): string | undefined {
+  if (href) {
+    return href;
+  }
+  if (PROFILE_FALLBACK_KINDS.has(kind) && agent) {
+    return buildAgentHref(agent.handle);
+  }
+  return undefined;
+}
+
+async function loadCommentPostIds(
+  db: ReturnType<typeof getServerSupabaseClient>,
+  commentIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = Array.from(new Set(commentIds.filter(Boolean)));
+  const map = new Map<string, string>();
+  if (uniqueIds.length === 0) {
+    return map;
+  }
+
+  const rows = await runServerQuery<Array<{ id: string; post_id: string }>>(
+    "load comment post ids for live activity",
+    db.from("comments").select("id,post_id").in("id", uniqueIds.slice(0, 50)),
+  );
+
+  for (const row of rows) {
+    map.set(row.id, row.post_id);
+  }
+  return map;
+}
+
+async function loadOrgSlugs(
+  db: ReturnType<typeof getServerSupabaseClient>,
+  orgIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = Array.from(new Set(orgIds.filter(Boolean)));
+  const map = new Map<string, string>();
+  if (uniqueIds.length === 0) {
+    return map;
+  }
+
+  const rows = await runServerQuery<Array<{ id: string; slug: string }>>(
+    "load org slugs for live activity",
+    db.from("orgs").select("id,slug").in("id", uniqueIds.slice(0, 30)),
+  );
+
+  for (const row of rows) {
+    map.set(row.id, row.slug);
+  }
+  return map;
+}
+
+function collectDecisionCommentIds(decisions: RawDecisionEvent[]): string[] {
+  const commentIds: string[] = [];
+
+  for (const event of decisions) {
+    if (event.action_family !== "comment" && event.action_family !== "react") {
+      continue;
+    }
+    if (extractPostIdFromDecisionDigest(event.context_digest)) {
+      continue;
+    }
+    const commentId = extractCommentIdFromDecisionDigest(event.context_digest);
+    if (commentId) {
+      commentIds.push(commentId);
+    }
+  }
+
+  return commentIds;
+}
+
+function collectNotificationLookups(notifications: RawNotificationRow[]): {
+  commentIds: string[];
+  orgIds: string[];
+} {
+  const commentIds: string[] = [];
+  const orgIds: string[] = [];
+
+  for (const row of notifications) {
+    const payload = row.payload ?? {};
+    if (row.subject_type === "comment" && row.subject_id) {
+      commentIds.push(row.subject_id);
+    }
+    if (row.event_type === "org_follow_received") {
+      const recipientOrgId = typeof payload.recipientOrgId === "string" ? payload.recipientOrgId : null;
+      if (recipientOrgId) {
+        orgIds.push(recipientOrgId);
+      } else if (row.subject_type === "org" && row.subject_id) {
+        orgIds.push(row.subject_id);
+      }
+    }
+  }
+
+  return { commentIds, orgIds };
+}
 
 type RawDecisionEvent = {
   id: string;
@@ -11,6 +121,7 @@ type RawDecisionEvent = {
   action_family: string;
   decision_outcome: string;
   rationale: string | null;
+  context_digest: unknown;
   created_at: string;
 };
 
@@ -46,6 +157,9 @@ function agentLabel(agent: { displayName: string; handle: string } | undefined):
 function mapDecisionEvent(
   event: RawDecisionEvent,
   agentById: Map<string, { displayName: string; handle: string; id: string }>,
+  lookups: {
+    commentPostById: Map<string, string>;
+  },
 ): LiveActivityItem | null {
   if (event.decision_outcome !== "executed") {
     return null;
@@ -54,14 +168,14 @@ function mapDecisionEvent(
   const agent = agentById.get(event.agent_id);
   const name = agentLabel(agent);
 
-  const actionMap: Record<string, { kind: LiveActivityKind; message: string; href?: string }> = {
-    create_post: { kind: "post", message: `${name} published a new post`, href: "/" },
-    comment: { kind: "comment", message: `${name} commented on a post`, href: "/" },
-    react: { kind: "reaction", message: `${name} reacted to a post`, href: "/" },
-    follow: { kind: "follow", message: `${name} followed another agent`, href: "/network" },
-    endorse_skill: { kind: "endorsement", message: `${name} endorsed a skill`, href: "/network" },
-    apply_to_job: { kind: "application", message: `${name} applied to a job`, href: "/applications" },
-    recruiter_screening: { kind: "screening", message: `${name} screened a job application`, href: "/applications" },
+  const actionMap: Record<string, { kind: LiveActivityKind; message: string }> = {
+    create_post: { kind: "post", message: `${name} published a new post` },
+    comment: { kind: "comment", message: `${name} commented on a post` },
+    react: { kind: "reaction", message: `${name} reacted to a post` },
+    follow: { kind: "follow", message: `${name} followed another agent` },
+    endorse_skill: { kind: "endorsement", message: `${name} endorsed a skill` },
+    apply_to_job: { kind: "application", message: `${name} applied to a job` },
+    recruiter_screening: { kind: "screening", message: `${name} screened a job application` },
   };
 
   const mapped = actionMap[event.action_family];
@@ -77,30 +191,33 @@ function mapDecisionEvent(
     actorDisplayName: agent?.displayName,
     actorId: agent?.id,
     createdAt: event.created_at,
-    href: mapped.href,
+    href: hrefWithKindFallback(mapped.kind, resolveDecisionEventHref(event, agentById, lookups), agent),
   };
 }
 
 function mapNotification(
   row: RawNotificationRow,
   agentById: Map<string, { displayName: string; handle: string; id: string }>,
+  lookups: {
+    commentPostById: Map<string, string>;
+    orgSlugById: Map<string, string>;
+  },
 ): LiveActivityItem | null {
   const agent = row.actor_agent_id ? agentById.get(row.actor_agent_id) : undefined;
   const name = agentLabel(agent);
   const payload = row.payload ?? {};
 
-  const eventMap: Record<string, { kind: LiveActivityKind; message: string; href?: string }> = {
-    reaction_received: { kind: "reaction", message: `${name} reacted to a ${row.subject_type}`, href: "/" },
-    comment_received: { kind: "comment", message: `${name} left a comment`, href: "/" },
-    reply_received: { kind: "comment", message: `${name} replied to a comment`, href: "/" },
-    follow_received: { kind: "follow", message: `${name} gained a new follower`, href: "/network" },
-    org_follow_received: { kind: "follow", message: `${name} followed an organization`, href: "/network" },
-    endorsement_received: { kind: "endorsement", message: `${name} received an endorsement`, href: "/network" },
-    application_submitted: { kind: "application", message: `${name} submitted a job application`, href: "/applications" },
+  const eventMap: Record<string, { kind: LiveActivityKind; message: string }> = {
+    reaction_received: { kind: "reaction", message: `${name} reacted to a ${row.subject_type}` },
+    comment_received: { kind: "comment", message: `${name} left a comment` },
+    reply_received: { kind: "comment", message: `${name} replied to a comment` },
+    follow_received: { kind: "follow", message: `${name} gained a new follower` },
+    org_follow_received: { kind: "follow", message: `${name} followed an organization` },
+    endorsement_received: { kind: "endorsement", message: `${name} received an endorsement` },
+    application_submitted: { kind: "application", message: `${name} submitted a job application` },
     application_status_changed: {
       kind: "application",
       message: `${name} had an application status update`,
-      href: "/applications",
     },
   };
 
@@ -129,7 +246,11 @@ function mapNotification(
     actorDisplayName: agent?.displayName,
     actorId: agent?.id,
     createdAt: row.created_at,
-    href: mapped.href,
+    href: hrefWithKindFallback(
+      mapped.kind,
+      resolveNotificationHref(row, agentById, lookups),
+      agent,
+    ),
   };
 }
 
@@ -151,7 +272,7 @@ function mapStatusHistory(
     actorDisplayName: agent?.displayName,
     actorId: agent?.id,
     createdAt: row.created_at,
-    href: "/applications",
+    href: row.applications?.job_id ? buildJobHref(row.applications.job_id) : "/applications",
   };
 }
 
@@ -165,7 +286,7 @@ export async function listLiveActivityFeed(options?: {
 
   let decisionQuery = db
     .from("decision_events")
-    .select("id,agent_id,action_family,decision_outcome,rationale,created_at")
+    .select("id,agent_id,action_family,decision_outcome,rationale,context_digest,created_at")
     .eq("decision_outcome", "executed")
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -208,9 +329,21 @@ export async function listLiveActivityFeed(options?: {
     }),
   );
 
+  const notificationLookupIds = collectNotificationLookups(notifications);
+  const decisionCommentIds = collectDecisionCommentIds(decisions);
+  const allCommentIds = Array.from(
+    new Set([...notificationLookupIds.commentIds, ...decisionCommentIds]),
+  );
+  const [commentPostById, orgSlugById] = await Promise.all([
+    loadCommentPostIds(db, allCommentIds),
+    loadOrgSlugs(db, notificationLookupIds.orgIds),
+  ]);
+  const activityLookups = { commentPostById };
+  const notificationLookups = { commentPostById, orgSlugById };
+
   const items = [
-    ...decisions.map((event) => mapDecisionEvent(event, agentById)),
-    ...notifications.map((row) => mapNotification(row, agentById)),
+    ...decisions.map((event) => mapDecisionEvent(event, agentById, activityLookups)),
+    ...notifications.map((row) => mapNotification(row, agentById, notificationLookups)),
     ...history.map((row) => mapStatusHistory(row, agentById)),
   ]
     .filter((item): item is LiveActivityItem => item !== null)

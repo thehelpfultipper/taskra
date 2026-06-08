@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { getPosts } from '@/lib/services/post.service';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { getPosts, getPostById } from '@/lib/services/post.service';
 import { PostCard } from './PostCard';
 import { PostComposer } from './PostComposer';
 import { Button } from './ui/Button';
@@ -15,16 +16,24 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { isDemoModeEnabled } from '@/lib/demo-mode';
 import { LiveActivityTracker } from '@/components/LiveActivityTracker';
+import { commentAnchorId, postAnchorId } from '@/lib/navigation-links';
 
 const DEMO_FEED_POLL_INTERVAL_MS = 15_000;
 
 export default function Feed() {
+  const searchParams = useSearchParams();
+  const targetPostId = searchParams.get('post');
+  const targetCommentId = searchParams.get('comment');
+  const openComments = searchParams.get('comments') === '1' || Boolean(targetCommentId);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<'for-you' | 'following' | 'recent'>('for-you');
   const [isDemo, setIsDemo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  const deepLinkHandledRef = useRef<string | null>(null);
 
   useEffect(() => {
     const demoEnabled = isDemoModeEnabled();
@@ -65,6 +74,83 @@ export default function Feed() {
   useEffect(() => {
     void loadPosts(activeTab);
   }, [activeTab, loadPosts, reloadKey]);
+
+  useEffect(() => {
+    if (!targetPostId) {
+      return;
+    }
+    setHighlightedPostId(targetPostId);
+    setHighlightedCommentId(targetCommentId);
+    setActiveTab('recent');
+    deepLinkHandledRef.current = null;
+  }, [targetPostId, targetCommentId]);
+
+  useEffect(() => {
+    if (!targetPostId || isLoading) {
+      return;
+    }
+
+    let highlightTimeoutId: number | undefined;
+
+    async function handleDeepLink() {
+      let postExists = posts.some((post) => post.id === targetPostId);
+
+      if (!postExists) {
+        try {
+          const post = await getPostById(targetPostId);
+          if (post) {
+            setPosts((previousPosts) => {
+              if (previousPosts.some((entry) => entry.id === post.id)) {
+                return previousPosts;
+              }
+              return [post, ...previousPosts];
+            });
+            postExists = true;
+          }
+        } catch {
+          postExists = false;
+        }
+      }
+
+      if (!postExists) {
+        toast.info('That post is not available in the feed right now.');
+        return;
+      }
+
+      if (deepLinkHandledRef.current === targetPostId) {
+        return;
+      }
+      deepLinkHandledRef.current = targetPostId;
+
+      const scrollToTarget = () => {
+        const scrollTargetId = targetCommentId ? commentAnchorId(targetCommentId) : postAnchorId(targetPostId);
+        document.getElementById(scrollTargetId)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      };
+
+      window.requestAnimationFrame(() => {
+        scrollToTarget();
+        if (targetCommentId) {
+          window.setTimeout(scrollToTarget, 400);
+        }
+      });
+
+      highlightTimeoutId = window.setTimeout(() => {
+        setHighlightedPostId((current) => (current === targetPostId ? null : current));
+        setHighlightedCommentId((current) => (current === targetCommentId ? null : current));
+      }, 4000);
+    }
+
+    void handleDeepLink();
+
+    return () => {
+      if (highlightTimeoutId !== undefined) {
+        window.clearTimeout(highlightTimeoutId);
+      }
+    };
+  }, [targetPostId, targetCommentId, isLoading, posts]);
 
   useEffect(() => {
     if (!isDemo) {
@@ -248,13 +334,21 @@ export default function Feed() {
             posts.map((post) => (
               <motion.div
                 key={post.id}
+                id={postAnchorId(post.id)}
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
               >
-                <PostCard post={post} />
+                <PostCard
+                  post={post}
+                  highlighted={highlightedPostId === post.id}
+                  initialShowComments={openComments && targetPostId === post.id}
+                  highlightedCommentId={
+                    targetPostId === post.id ? highlightedCommentId ?? targetCommentId : null
+                  }
+                />
               </motion.div>
             ))
           ) : (

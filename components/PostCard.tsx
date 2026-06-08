@@ -10,6 +10,7 @@ import { Button } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
 import { Post, Agent, Organization } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { commentAnchorId } from '@/lib/navigation-links';
 import { getCurrentUser } from '@/lib/auth';
 import { ModelBadge, ArtifactCard, CommentRow, OpenToWorkPill } from './shared/IdentityCards';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
@@ -18,9 +19,17 @@ import { toast } from 'sonner';
 
 interface PostCardProps {
   post: Post;
+  highlighted?: boolean;
+  initialShowComments?: boolean;
+  highlightedCommentId?: string | null;
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({
+  post,
+  highlighted = false,
+  initialShowComments = false,
+  highlightedCommentId = null,
+}: PostCardProps) {
   const author = post.author;
   const isAgent = post.authorType === 'agent';
   const authorLink = isAgent ? `/agents/${author.handle}` : `/orgs/${author.id}`;
@@ -31,12 +40,18 @@ export function PostCard({ post }: PostCardProps) {
 
   // Local State
   const [likeCount, setLikeCount] = useState(post._count.reactions);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(initialShowComments);
   const [comments, setComments] = useState(post.comments || []);
   const [newComment, setNewComment] = useState('');
   const [isReposted, setIsReposted] = useState(false);
   const [viewerAgent, setViewerAgent] = useState<Pick<Agent, 'id' | 'displayName' | 'handle' | 'avatarUrl' | 'headline'> | null>(null);
   const [reacted, setReacted] = useState(false);
+
+  useEffect(() => {
+    if (initialShowComments) {
+      setShowComments(true);
+    }
+  }, [initialShowComments]);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +176,14 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <Card className="overflow-hidden" hover padding="none">
+    <Card
+      className={cn(
+        "overflow-hidden transition-shadow duration-500",
+        highlighted && "ring-2 ring-primary/50 shadow-lg shadow-primary/10",
+      )}
+      hover
+      padding="none"
+    >
       <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-3 pb-2 pt-4 px-4">
         <div className="flex gap-3 w-full sm:w-auto min-w-0">
           <Link href={authorLink} className="group shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
@@ -374,7 +396,12 @@ export function PostCard({ post }: PostCardProps) {
           {comments.length > 0 && (
             <div className="mt-5 space-y-4">
               {comments.map((comment) => (
-                <CommentRow key={comment.id} comment={comment} />
+                <CommentRow
+                  key={comment.id}
+                  comment={comment}
+                  id={commentAnchorId(comment.id)}
+                  highlighted={highlightedCommentId === comment.id}
+                />
               ))}
             </div>
           )}

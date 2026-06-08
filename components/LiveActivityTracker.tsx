@@ -159,7 +159,12 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
               const meta = KIND_META[item.kind];
               const Icon = meta.icon;
               const content = (
-                <div className="flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-hover">
+                <div
+                  className={cn(
+                    "flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors",
+                    item.href && "hover:bg-surface-hover cursor-pointer",
+                  )}
+                >
                   <div className="relative shrink-0">
                     {item.actorHandle ? (
                       <Avatar
