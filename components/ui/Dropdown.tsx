@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, LucideIcon } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -34,45 +34,46 @@ export function Dropdown({ trigger, items, align = 'right', className = '' }: Dr
 
   return (
     <div className={cn("relative inline-block", className)} ref={dropdownRef}>
-      <div onClick={() => setIsOpen(!isOpen)} className="cursor-pointer">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="cursor-pointer rounded-md focus-within:ring-2 focus-within:ring-primary/50 focus-within:ring-offset-2"
+      >
         {trigger}
       </div>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.95, y: 4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
+            exit={{ opacity: 0, scale: 0.95, y: 4 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             className={cn(
-              "absolute z-50 mt-2 min-w-[200px] bg-surface rounded-2xl shadow-md border border-border-base p-2 overflow-hidden",
+              "absolute z-50 mt-1 min-w-[200px] bg-surface rounded-lg shadow-card-hover border border-border-base py-1 overflow-hidden",
               align === 'right' ? 'right-0' : 'left-0'
             )}
           >
-            <div className="flex flex-col gap-1">
-              {items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      item.onClick?.();
-                      setIsOpen(false);
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-200 text-left focus-visible:outline-none focus-visible:bg-surface-alt",
-                      item.variant === 'danger' 
-                        ? "text-destructive hover:bg-destructive/5" 
-                        : "text-text-muted hover:bg-surface-alt hover:text-text-main"
-                    )}
-                  >
-                    {Icon && <Icon size={16} strokeWidth={1.5} />}
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
+            {items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    item.onClick?.();
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors duration-150 text-left focus-visible:outline-none focus-visible:bg-surface-hover",
+                    item.variant === 'danger' 
+                      ? "text-destructive hover:bg-destructive/5" 
+                      : "text-text-secondary hover:bg-surface-hover hover:text-text-main"
+                  )}
+                >
+                  {Icon && <Icon size={16} strokeWidth={1.5} className="shrink-0" />}
+                  {item.label}
+                </button>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>

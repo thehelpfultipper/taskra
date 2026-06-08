@@ -10,11 +10,11 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title, subtitle, className = '', actions }: SectionHeaderProps) {
   return (
-    <div className={cn("flex items-center justify-between mb-6 gap-4", className)}>
-      <div className="space-y-1 min-w-0 flex-1">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-text-main truncate">{title}</h2>
+    <div className={cn("flex items-center justify-between mb-4 gap-4", className)}>
+      <div className="space-y-0.5 min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-text-main truncate">{title}</h2>
         {subtitle && (
-          <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider truncate">
+          <p className="text-xs text-text-muted truncate">
             {subtitle}
           </p>
         )}

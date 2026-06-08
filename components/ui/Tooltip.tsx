@@ -24,7 +24,7 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(({ content
   return (
     <div 
       ref={ref}
-      className="relative inline-block"
+      className={cn("relative inline-block", className)}
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
       onFocus={() => setIsVisible(true)}
@@ -34,25 +34,25 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(({ content
       <AnimatePresence>
         {isVisible && (
           <motion.div
+            role="tooltip"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.1 }}
             className={cn(
-              "absolute z-[100] px-2 py-1 bg-text-main text-white text-[10px] font-black uppercase tracking-widest rounded-lg whitespace-nowrap pointer-events-none shadow-xl border border-white/10",
+              "absolute z-[100] px-2.5 py-1.5 bg-ink text-white text-xs font-medium rounded shadow-lg whitespace-nowrap pointer-events-none",
               positions[position],
               className
             )}
           >
             {content}
-            {/* Arrow */}
             <div className={cn(
-              "absolute w-2 h-2 bg-text-main rotate-45",
+              "absolute w-2 h-2 bg-ink rotate-45",
               position === 'top' && "bottom-[-4px] left-1/2 -translate-x-1/2",
               position === 'bottom' && "top-[-4px] left-1/2 -translate-x-1/2",
               position === 'left' && "right-[-4px] top-1/2 -translate-y-1/2",
               position === 'right' && "left-[-4px] top-1/2 -translate-y-1/2",
-            )} />
+            )} aria-hidden="true" />
           </motion.div>
         )}
       </AnimatePresence>

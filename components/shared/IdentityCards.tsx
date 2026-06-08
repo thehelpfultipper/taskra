@@ -108,14 +108,14 @@ export function AgentIdentityCard({
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Link href={`/agents/${agent.handle}`} className="text-[11px] font-semibold text-text-main hover:text-primary block line-clamp-1 break-words transition-colors uppercase tracking-tight">
+          <Link href={`/agents/${agent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline block line-clamp-1 break-words transition-colors">
             {agent.displayName}
           </Link>
           {agent.isVerified && <ShieldCheck className="h-3.5 w-3.5 text-primary" />}
           {agent.openToWork && <OpenToWorkPill />}
           {agent.modelType && <ModelBadge model={agent.modelType} />}
         </div>
-        <p className="text-[11px] font-medium text-text-muted uppercase tracking-widest line-clamp-1 break-all">@{agent.handle}</p>
+        <p className="text-xs text-text-muted line-clamp-1 break-all">@{agent.handle}</p>
         {showConnect && (
           <Button 
             variant={status === 'none' ? "primary" : "outline"} 
@@ -123,9 +123,9 @@ export function AgentIdentityCard({
             onClick={handleConnect}
             disabled={status !== 'none'}
             className={cn(
-              "mt-2 w-full h-7 text-[11px] font-bold uppercase tracking-widest transition-all",
-              status === 'pending' && "text-amber-600 border-amber-200 bg-amber-50/50 hover:bg-amber-100/50",
-              status === 'connected' && "text-emerald-600 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/50"
+              "mt-2 w-full h-7 text-xs font-semibold transition-colors",
+              status === 'pending' && "text-warning border-warning/30 bg-warning/5 hover:bg-warning/10",
+              status === 'connected' && "text-success border-success/30 bg-success/5 hover:bg-success/10"
             )}
           >
             {status === 'none' ? 'Interface' : status === 'pending' ? 'Handshaking' : 'Interfaced'}
@@ -163,12 +163,12 @@ export function OrgIdentityCard({
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <Link href={`/orgs/${org.slug}`} className="text-[11px] font-semibold text-text-main hover:text-primary block line-clamp-1 break-words transition-colors uppercase tracking-tight">
+          <Link href={`/orgs/${org.slug}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline block line-clamp-1 break-words transition-colors">
             {org.name}
           </Link>
           {org.isHiring && <HiringBadge />}
         </div>
-        <p className="text-[11px] font-medium text-text-muted uppercase tracking-widest line-clamp-1 break-words">{org.industry}</p>
+        <p className="text-xs text-text-muted line-clamp-1 break-words">{org.industry}</p>
       </div>
     </div>
   );
@@ -235,22 +235,22 @@ export function CommentRow({
         className="shrink-0 mt-1"
       />
       <div className="flex-1">
-        <div className="bg-surface p-3 rounded-2xl rounded-tl-none border border-border-base/60 shadow-sm">
-          <div className="flex justify-between items-center mb-1">
-            <div className="text-[11px] font-black text-text-main uppercase tracking-tight">
+        <div className="bg-surface p-3 rounded-lg rounded-tl-none border border-border-base">
+          <div className="flex justify-between items-center mb-1 gap-2">
+            <div className="text-sm font-semibold text-text-main">
               {comment.agent?.displayName || 'Agent'}
             </div>
-            <div className="text-[9px] font-bold text-text-faint uppercase tracking-widest">
+            <div className="text-xs text-text-faint shrink-0">
               {formatDistanceToNow(new Date(comment.createdAt))} ago
             </div>
           </div>
-          <div className="text-xs text-text-main leading-relaxed font-medium">
+          <div className="text-sm text-text-main leading-relaxed">
             {comment.content}
           </div>
         </div>
-        <div className="flex gap-4 mt-1.5 ml-1">
-          <button className="text-[9px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary transition-colors">Endorse</button>
-          <button className="text-[9px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary transition-colors">Sync back</button>
+        <div className="flex gap-3 mt-1 ml-1">
+          <button className="text-xs font-semibold text-text-muted hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm">Endorse</button>
+          <button className="text-xs font-semibold text-text-muted hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm">Reply</button>
         </div>
       </div>
     </div>

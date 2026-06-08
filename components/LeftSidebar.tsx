@@ -20,43 +20,41 @@ export async function LeftSidebar() {
   if (!activeAgent) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card className="overflow-hidden" hover padding="none">
-        <div className="h-24 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent" />
-        </div>
-        <div className="px-6 pb-8 -mt-12 text-center relative z-10">
-          <Link href={`/agents/${activeAgent.handle}`} className="inline-block group">
+        <div className="h-16 bg-gradient-to-r from-primary/15 to-primary/5 relative" />
+        <div className="px-4 pb-6 -mt-10 text-center relative z-10">
+          <Link href={`/agents/${activeAgent.handle}`} className="inline-block group rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
             <Avatar 
               src={`https://picsum.photos/seed/${activeAgent.handle}/200`} 
               alt={activeAgent.displayName}
               size="xl"
               imageSizes="96px"
               status="online"
-              className="mx-auto ring-4 ring-surface shadow-xl group-hover:scale-105 transition-transform duration-300"
+              className="mx-auto ring-2 ring-surface"
             />
           </Link>
-          <div className="mt-4 space-y-1">
-            <Link href={`/agents/${activeAgent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary transition-colors block line-clamp-1 break-words uppercase tracking-tight">
+          <div className="mt-3 space-y-0.5">
+            <Link href={`/agents/${activeAgent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline transition-colors block line-clamp-1 break-words">
               {activeAgent.displayName}
             </Link>
-            <p className="text-[11px] font-medium text-text-muted/60 uppercase tracking-widest line-clamp-1 break-all">
+            <p className="text-xs text-text-muted line-clamp-1 break-all">
               @{activeAgent.handle}
             </p>
           </div>
           
-          <p className="text-sm text-text-muted mt-4 line-clamp-2 leading-relaxed break-words">
+          <p className="text-sm text-text-secondary mt-3 line-clamp-2 leading-relaxed break-words text-left">
             {activeAgent.bio}
           </p>
           
-          <div className="mt-8 pt-6 border-t border-border-base/50 text-left divide-y divide-border-base/10 -my-2">
-            <Link href="/network" className="flex justify-between items-center group py-3 transition-all gap-3">
-              <span className="text-[10px] font-black text-text-muted/60 group-hover:text-text-muted transition-colors uppercase tracking-[0.1em] truncate flex-1 min-w-0 block">Inference hits</span>
-              <span className="text-[13px] font-black text-primary tabular-nums tracking-tight shrink-0">{(activeAgent.handle.length * 123 % 1000).toLocaleString()}</span>
+          <div className="mt-4 pt-4 border-t border-border-base text-left divide-y divide-border-base">
+            <Link href="/network" className="flex justify-between items-center group py-2.5 transition-colors rounded-md hover:bg-surface-hover px-1 -mx-1 gap-3">
+              <span className="text-xs text-text-muted group-hover:text-text-main transition-colors truncate flex-1 min-w-0">Inference hits</span>
+              <span className="text-sm font-semibold text-primary tabular-nums shrink-0">{(activeAgent.handle.length * 123 % 1000).toLocaleString()}</span>
             </Link>
-            <div className="flex justify-between items-center group py-3 transition-all gap-3">
-              <span className="text-[10px] font-black text-text-muted/60 group-hover:text-text-muted transition-colors uppercase tracking-[0.1em] truncate flex-1 min-w-0 block">Token propagation</span>
-              <span className="text-[13px] font-black text-primary tabular-nums tracking-tight shrink-0">{(activeAgent.handle.length * 456 % 5000).toLocaleString()}</span>
+            <div className="flex justify-between items-center group py-2.5 gap-3 px-1 -mx-1">
+              <span className="text-xs text-text-muted truncate flex-1 min-w-0">Token propagation</span>
+              <span className="text-sm font-semibold text-primary tabular-nums shrink-0">{(activeAgent.handle.length * 456 % 5000).toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -66,7 +64,7 @@ export async function LeftSidebar() {
         <SectionHeader 
           title="Live Telemetry" 
           subtitle="Real-time performance" 
-          className="mb-6" 
+          className="mb-4" 
         />
         <div className="divide-y divide-border-base/10 -my-1">
           <MetricRow 

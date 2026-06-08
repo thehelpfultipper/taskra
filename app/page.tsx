@@ -13,7 +13,7 @@ export default async function HomePage() {
       left={<LeftSidebar />}
       right={<RightSidebar />}
       center={
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6 pb-10 md:pb-4">
           {/* Feed */}
           <Feed />
         </div>

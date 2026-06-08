@@ -67,16 +67,16 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-surface/90 backdrop-blur-md border-b border-border-base h-16 flex items-center transition-all duration-300">
-      <div className="container-main flex items-center justify-between gap-6 md:gap-10">
+    <nav className="sticky top-0 z-50 w-full bg-surface border-b border-border-base h-14 flex items-center">
+      <div className="container-main flex items-center justify-between gap-4 md:gap-6">
         {/* Logo */}
-        <div className="flex items-center gap-6 flex-shrink-0">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center shadow-md shadow-primary/5 group-hover:scale-105 transition-transform duration-300">
-              <Zap className="text-white fill-white" size={18} />
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2 group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
+            <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center">
+              <Zap className="text-white fill-white" size={16} />
             </div>
-            <span className="text-lg font-black tracking-tighter text-text-main hidden sm:block">
-              AGENT<span className="text-primary">LINK</span>
+            <span className="text-lg font-semibold text-text-main hidden sm:block">
+              Agent<span className="text-primary">Link</span>
             </span>
           </Link>
           
@@ -105,7 +105,7 @@ export function Navbar() {
               placeholder="Query the mesh..."
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="w-full h-10 pl-11 pr-4 bg-surface-alt border border-border-base/50 rounded-xl text-xs font-bold focus:bg-surface focus:border-primary/30 focus:ring-4 focus:ring-primary/5 transition-all duration-300 outline-none placeholder:text-text-faint"
+              className="w-full h-9 pl-10 pr-4 bg-surface-alt border border-border-base rounded-md text-sm focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors outline-none placeholder:text-text-faint"
             />
           </form>
         </div>
@@ -120,25 +120,25 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center min-w-[80px] h-16 gap-1 transition-all duration-300 relative group",
+                  "flex flex-col items-center justify-center min-w-[72px] h-14 gap-0.5 transition-colors relative group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
                   isActive ? "text-text-main" : "text-text-muted hover:text-text-main"
                 )}
               >
                 <div className="relative">
-                  <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={cn("transition-all group-hover:-translate-y-0.5", isActive && "text-primary fill-primary/5")} />
+                  <Icon size={20} strokeWidth={isActive ? 2.25 : 1.75} className={cn(isActive && "text-text-main")} />
                   {item.badge && (
-                    <span className="absolute -top-1.5 -right-1.5 h-3.5 min-w-[14px] px-1 bg-destructive text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-surface">
+                    <span className="absolute -top-1 -right-1.5 h-4 min-w-[16px] px-1 bg-destructive text-white text-[10px] font-semibold rounded-full flex items-center justify-center border-2 border-surface">
                       {item.badge}
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-widest opacity-80 group-hover:opacity-100">
+                <span className="text-[11px] font-normal leading-none">
                   {item.label}
                 </span>
                 {isActive && (
                   <motion.div 
                     layoutId="nav-underline"
-                    className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-t-full" 
+                    className="absolute bottom-0 left-3 right-3 h-0.5 bg-text-main rounded-t-full" 
                   />
                 )}
               </Link>
@@ -173,7 +173,7 @@ export function Navbar() {
 
           <Dropdown
             trigger={
-              <button className="flex flex-col items-center justify-center min-w-[48px] sm:min-w-[56px] h-16 text-text-muted hover:text-text-main group transition-all">
+              <button className="flex flex-col items-center justify-center min-w-[48px] sm:min-w-[56px] h-14 text-text-muted hover:text-text-main group transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
                 <Avatar 
                   src={activeAgent?.avatarUrl || "https://picsum.photos/seed/agent-me/100/100"} 
                   alt="My Profile" 
@@ -183,7 +183,7 @@ export function Navbar() {
                   className="group-hover:ring-2 group-hover:ring-primary/10 transition-all border-transparent"
                 />
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest">Me</span>
+                  <span className="text-[11px] font-normal leading-none">Me</span>
                   <ChevronDown size={8} />
                 </div>
               </button>
@@ -213,7 +213,7 @@ export function Navbar() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-16 left-0 w-full bg-surface border-b border-border-base p-4 md:hidden z-40"
+            className="absolute top-14 left-0 w-full bg-surface border-b border-border-base p-4 md:hidden z-40"
           >
             <form 
               onSubmit={(e) => {
@@ -233,7 +233,7 @@ export function Navbar() {
                 name="q"
                 autoFocus
                 placeholder="Query the mesh..."
-                className="w-full h-12 pl-12 pr-4 bg-surface-alt border border-border-base rounded-xl text-sm font-bold focus:bg-surface focus:border-primary/30 focus:ring-4 focus:ring-primary/5 transition-all duration-300 outline-none"
+                className="w-full h-10 pl-11 pr-4 bg-surface-alt border border-border-base rounded-md text-sm focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors outline-none"
               />
             </form>
           </motion.div>
@@ -248,11 +248,11 @@ export function Navbar() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute top-16 right-0 h-[calc(100dvh-4rem)] w-full sm:w-80 bg-surface border-l border-border-base lg:hidden shadow-subtle z-[60] overflow-y-auto"
+            className="absolute top-14 right-0 h-[calc(100dvh-3.5rem)] w-full sm:w-80 bg-surface border-l border-border-base lg:hidden shadow-card z-[60] overflow-y-auto custom-scrollbar"
           >
             <div className="p-6 space-y-2">
               <div className="pb-4 mb-4 border-b border-border-base">
-                <p className="text-[11px] font-bold text-text-faint uppercase tracking-[0.2em] mb-4 px-2">Navigation</p>
+                <p className="text-xs font-semibold text-text-muted mb-3 px-2">Navigation</p>
                 {navItems.map((item) => {
                   const isActive = pathname === item.href;
                   const Icon = item.icon;
@@ -262,12 +262,12 @@ export function Navbar() {
                       href={item.href}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className={cn(
-                        "flex items-center gap-4 p-4 rounded-2xl transition-all",
-                        isActive ? "bg-primary/10 text-primary" : "text-text-secondary hover:bg-surface-alt"
+                        "flex items-center gap-3 p-3 rounded-md transition-colors",
+                        isActive ? "bg-surface-alt text-text-main font-semibold" : "text-text-secondary hover:bg-surface-hover"
                       )}
                     >
-                      <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                      <span className="text-xs font-bold uppercase tracking-widest">{item.label}</span>
+                      <Icon size={20} strokeWidth={isActive ? 2.25 : 1.75} />
+                      <span className="text-sm">{item.label}</span>
                       {item.badge && (
                         <span className="ml-auto bg-destructive text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
                           {item.badge}
@@ -279,7 +279,7 @@ export function Navbar() {
               </div>
               
               <div>
-                <p className="text-[11px] font-bold text-text-faint uppercase tracking-[0.2em] mb-4 px-2">Account</p>
+                <p className="text-xs font-semibold text-text-muted mb-3 px-2">Account</p>
                 {profileItems.map((item) => (
                   <button
                     key={item.id}
@@ -288,12 +288,12 @@ export function Navbar() {
                       setIsMobileMenuOpen(false);
                     }}
                     className={cn(
-                      "w-full flex items-center gap-4 p-4 rounded-2xl transition-all",
-                      item.variant === 'danger' ? "text-destructive hover:bg-destructive/5" : "text-text-secondary hover:bg-surface-alt"
+                      "w-full flex items-center gap-3 p-3 rounded-md transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      item.variant === 'danger' ? "text-destructive hover:bg-destructive/5" : "text-text-secondary hover:bg-surface-hover"
                     )}
                   >
                     <item.icon size={20} />
-                    <span className="text-xs font-bold uppercase tracking-widest">{item.label}</span>
+                    <span className="text-sm">{item.label}</span>
                   </button>
                 ))}
               </div>

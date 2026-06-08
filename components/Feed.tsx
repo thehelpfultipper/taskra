@@ -12,6 +12,7 @@ import { Post } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -95,27 +96,36 @@ export default function Feed() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-1 bg-surface-alt/40 backdrop-blur-sm p-1.5 rounded-2xl border border-border-base/40">
+    <div className="space-y-4">
+      <div className="flex items-center gap-1 bg-surface border border-border-base p-1 rounded-lg">
         <button 
           onClick={() => setActiveTab('for-you')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'for-you' ? 'bg-surface text-primary shadow-sm border border-border-base/20' : 'text-text-muted/60 hover:text-text-main hover:bg-surface/40'}`}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            activeTab === 'for-you' ? 'bg-surface-alt text-text-main' : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
+          )}
         >
-          <Sparkles size={14} className={activeTab === 'for-you' ? "text-primary" : "text-text-muted/40"} />
+          <Sparkles size={16} className={activeTab === 'for-you' ? "text-primary" : "text-text-faint"} />
           For You
         </button>
         <button 
           onClick={() => setActiveTab('following')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'following' ? 'bg-surface text-primary shadow-sm border border-border-base/20' : 'text-text-muted/60 hover:text-text-main hover:bg-surface/40'}`}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            activeTab === 'following' ? 'bg-surface-alt text-text-main' : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
+          )}
         >
-          <Users size={14} className={activeTab === 'following' ? "text-primary" : "text-text-muted/40"} />
+          <Users size={16} className={activeTab === 'following' ? "text-primary" : "text-text-faint"} />
           Following
         </button>
         <button 
           onClick={() => setActiveTab('recent')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${activeTab === 'recent' ? 'bg-surface text-primary shadow-sm border border-border-base/20' : 'text-text-muted/60 hover:text-text-main hover:bg-surface/40'}`}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+            activeTab === 'recent' ? 'bg-surface-alt text-text-main' : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
+          )}
         >
-          <Clock size={14} className={activeTab === 'recent' ? "text-primary" : "text-text-muted/40"} />
+          <Clock size={16} className={activeTab === 'recent' ? "text-primary" : "text-text-faint"} />
           Recent
         </button>
       </div>
@@ -123,16 +133,16 @@ export default function Feed() {
       <PostComposer onPost={handleNewPost} />
       
       <div className="flex items-center justify-between gap-4">
-        <div className="h-[1px] flex-1 bg-border-base/40" />
+        <div className="h-px flex-1 bg-border-base" />
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted/40">Sort by:</span>
-          <Button variant="ghost" size="xs" className="h-8 gap-1.5 px-3 text-[10px] font-black uppercase tracking-widest text-text-main hover:bg-surface-alt/60 rounded-lg">
-            Top <ChevronDown className="h-3 w-3 text-primary/60" />
+          <span className="text-xs text-text-muted">Sort by:</span>
+          <Button variant="ghost" size="xs" className="h-8 gap-1 px-2 text-sm font-semibold text-text-main hover:bg-surface-hover rounded-md">
+            Top <ChevronDown className="h-3.5 w-3.5 text-text-muted" />
           </Button>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <AnimatePresence mode="popLayout">
           {isLoading ? (
             <motion.div
@@ -143,7 +153,7 @@ export default function Feed() {
               className="space-y-4"
             >
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-surface p-6 rounded-3xl border border-border-base/50 space-y-4">
+                <div key={i} className="bg-surface p-5 rounded-lg border border-border-base space-y-4">
                   <div className="flex items-center gap-3">
                     <Skeleton className="h-12 w-12 rounded-2xl" />
                     <div className="space-y-2">

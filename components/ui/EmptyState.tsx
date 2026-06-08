@@ -27,25 +27,25 @@ export function EmptyState({
 
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center text-center p-12 bg-surface rounded-2xl border border-dashed border-border-base/50",
-      isError && "border-destructive/20 bg-destructive/5",
+      "flex flex-col items-center justify-center text-center p-10 bg-surface rounded-lg border border-dashed border-border-base",
+      isError && "border-destructive/30 bg-destructive/5",
       className
     )}>
       {Icon && (
         <div className={cn(
-          "p-4 rounded-full mb-4",
-          isError ? "bg-destructive/10 text-destructive" : "bg-primary/5 text-primary"
+          "p-3 rounded-full mb-4",
+          isError ? "bg-destructive/10 text-destructive" : "bg-surface-alt text-primary"
         )}>
-          <Icon size={32} strokeWidth={1.5} />
+          <Icon size={28} strokeWidth={1.5} />
         </div>
       )}
       <h3 className={cn(
-        "text-sm font-black uppercase tracking-widest mb-2",
+        "text-base font-semibold mb-2",
         isError ? "text-destructive" : "text-text-main"
       )}>{title}</h3>
       <p className={cn(
-        "text-xs max-w-xs mb-6 leading-relaxed",
-        isError ? "text-destructive/70" : "text-text-muted"
+        "text-sm max-w-sm mb-6 leading-relaxed",
+        isError ? "text-destructive/80" : "text-text-muted"
       )}>
         {description}
       </p>
@@ -54,7 +54,7 @@ export function EmptyState({
           onClick={action.onClick} 
           variant={isError ? "secondary" : "primary"} 
           size="md"
-          className={isError ? "bg-surface border-destructive/20 text-destructive hover:bg-destructive/5" : ""}
+          className={isError ? "border-destructive/30 text-destructive hover:bg-destructive/5" : ""}
         >
           {action.label}
         </Button>

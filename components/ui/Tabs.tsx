@@ -30,24 +30,26 @@ export function Tabs({ tabs, activeTab, onChange, className = '', variant = 'und
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
+              aria-selected={isActive}
+              role="tab"
               className={cn(
-                "px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all relative focus-visible:outline-none focus-visible:bg-surface-alt",
-                isActive ? "text-primary" : "text-text-muted hover:text-text-main"
+                "px-4 py-3 text-sm font-semibold transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded-t-md",
+                isActive ? "text-text-main" : "text-text-muted hover:text-text-main hover:bg-surface-hover"
               )}
             >
               <div className="flex items-center gap-2">
                 {tab.label}
                 {tab.count !== undefined && (
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-lg text-[10px]",
-                    isActive ? "bg-primary/10 text-primary" : "bg-surface-alt text-text-muted"
+                    "px-1.5 py-0.5 rounded text-xs font-medium",
+                    isActive ? "bg-surface-alt text-text-main" : "bg-surface-alt text-text-muted"
                   )}>
                     {tab.count}
                   </span>
                 )}
               </div>
               {isActive && (
-                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" />
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-text-main rounded-t-full" aria-hidden="true" />
               )}
             </button>
           );
@@ -57,17 +59,19 @@ export function Tabs({ tabs, activeTab, onChange, className = '', variant = 'und
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
+            aria-selected={isActive}
+            role="tab"
             className={cn(
-              "px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-              isActive ? "bg-primary text-white" : "bg-surface-alt text-text-muted hover:bg-border-base/50"
+              "px-4 py-1.5 text-sm font-semibold rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+              isActive ? "bg-primary text-white" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
             <div className="flex items-center gap-2">
               {tab.label}
               {tab.count !== undefined && (
                 <span className={cn(
-                  "px-1.5 py-0.5 rounded-lg text-[10px]",
-                  isActive ? "bg-white/20 text-white" : "bg-border-base/50 text-text-muted"
+                  "px-1.5 py-0.5 rounded text-xs font-medium",
+                  isActive ? "bg-white/20 text-white" : "bg-surface-alt text-text-muted"
                 )}>
                   {tab.count}
                 </span>

@@ -13,15 +13,15 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(({ children, cla
     none: 'p-0',
     sm: 'p-3 md:p-4',
     md: 'p-4 md:p-5',
-    lg: 'p-6 md:p-10',
+    lg: 'p-6 md:p-8',
   };
 
   return (
     <div 
       ref={ref}
       className={cn(
-        'bg-surface rounded-3xl border border-border-base shadow-subtle transition-all duration-300 overflow-hidden',
-        hover && 'hover:shadow-card-hover hover:border-primary/20 hover:-translate-y-0.5',
+        'bg-surface rounded-lg border border-border-base shadow-subtle overflow-hidden',
+        hover && 'transition-shadow duration-150 hover:shadow-card-hover',
         paddings[padding],
         className
       )}
@@ -52,7 +52,7 @@ export function CardContent({ children, className }: { children: React.ReactNode
 
 export function CardFooter({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("mt-6 pt-4 border-t border-border-base flex items-center justify-between gap-4", className)}>
+    <div className={cn("mt-4 pt-3 border-t border-border-base flex items-center justify-between gap-2", className)}>
       {children}
     </div>
   );

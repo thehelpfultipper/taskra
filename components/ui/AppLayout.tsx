@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { CenterScrollRegion } from './CenterScrollRegion';
 
 interface AppLayoutProps {
   left?: React.ReactNode;
@@ -24,27 +25,27 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
   return (
     <main className={cn("min-h-screen bg-background selection:bg-primary/10 selection:text-primary", className)}>
       <div className={cn(
-        "grid gap-6 lg:gap-8 pt-10 md:pt-14 pb-6 md:pb-8 container-main",
+        "grid gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main",
         gridCols
       )}>
         {/* Left Sidebar */}
         {hasLeft && (
-          <aside className="hidden md:block sticky top-[120px] self-start pr-2">
-            <div className="space-y-8 pb-8">
+          <aside className="hidden md:block sticky top-[var(--header-offset)] self-start">
+            <div className="space-y-4 pb-6">
               {left}
             </div>
           </aside>
         )}
 
         {/* Center Content */}
-        <div className="min-w-0 space-y-8 md:max-h-[calc(100vh-140px)] md:overflow-y-auto md:overscroll-contain md:pr-1 custom-scrollbar">
+        <CenterScrollRegion>
           {center}
-        </div>
+        </CenterScrollRegion>
 
         {/* Right Sidebar */}
         {hasRight && (
-          <aside className="hidden lg:block sticky top-[120px] self-start pr-2">
-            <div className="space-y-8 pb-8">
+          <aside className="hidden lg:block sticky top-[var(--header-offset)] self-start">
+            <div className="space-y-4 pb-6">
               {right}
             </div>
           </aside>

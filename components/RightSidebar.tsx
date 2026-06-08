@@ -66,75 +66,75 @@ export function RightSidebar() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card padding="md" className="border-border-base bg-surface/80 backdrop-blur-sm overflow-hidden">
+    <div className="space-y-4">
+      <Card padding="md" className="overflow-hidden">
         <SectionHeader 
           title="Optimized Models" 
           subtitle="Top performing agents" 
-          actions={<Info className="h-3 w-3 text-text-muted/40 hover:text-text-muted transition-colors cursor-help" />}
-          className="mb-6" 
+          actions={<Info className="h-4 w-4 text-text-muted hover:text-text-main transition-colors cursor-help" />}
+          className="mb-4" 
         />
-        <div className="space-y-5">
+        <div className="space-y-4">
           {trendingAgents.map((agent: Agent) => (
             <AgentIdentityCard key={agent.id} agent={agent} />
           ))}
         </div>
         
-        <Link href="/network" className="mt-6 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary hover:bg-primary/5 py-3 rounded-xl transition-all border border-border-base/40 hover:border-primary/30 bg-surface-alt/30">
+        <Link href="/network" className="mt-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-text-muted hover:text-primary hover:bg-surface-hover py-2.5 rounded-md transition-colors border border-border-base">
           Explore all models
-          <ChevronRight size={12} />
+          <ChevronRight size={14} />
         </Link>
       </Card>
 
-      <Card padding="md" className="border-border-base/60 bg-surface/80 backdrop-blur-sm overflow-hidden">
+      <Card padding="md" className="overflow-hidden">
         <SectionHeader 
           title="Active Clusters" 
           subtitle="Most active labs" 
-          className="mb-6" 
+          className="mb-4" 
         />
-        <div className="space-y-4">
+        <div className="space-y-3">
           {trendingOrgs.map((org: Organization) => (
             <OrgIdentityCard key={org.id} org={org} />
           ))}
         </div>
       </Card>
 
-      <Card padding="md" className="border-border-base/60 bg-surface/80 backdrop-blur-sm overflow-hidden">
+      <Card padding="md" className="overflow-hidden">
         <SectionHeader 
           title="Open Deployments" 
           subtitle="Based on your telemetry" 
-          className="mb-6" 
+          className="mb-4" 
         />
-        <div className="space-y-5">
+        <div className="space-y-4">
           {suggestedJobs.map((job: Job) => (
-            <div key={job.id} className="group cursor-pointer">
-              <Link href={`/jobs/${job.id}`} className="text-[11px] font-black text-text-main group-hover:text-primary block line-clamp-1 break-words transition-colors uppercase tracking-tight">
+            <div key={job.id} className="group cursor-pointer rounded-md p-1 -mx-1 hover:bg-surface-hover transition-colors">
+              <Link href={`/jobs/${job.id}`} className="text-sm font-semibold text-text-main group-hover:text-primary block line-clamp-1 break-words transition-colors">
                 {job.title}
               </Link>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="text-[10px] font-bold text-text-muted/60 uppercase tracking-widest line-clamp-1 break-words">{job.org.name}</span>
-                <span className="h-1 w-1 rounded-full bg-text-muted/30 shrink-0" />
-                <span className="text-[10px] font-black text-success uppercase tracking-widest shrink-0">{job.salaryRange}</span>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-xs text-text-muted line-clamp-1 break-words">{job.org.name}</span>
+                <span className="h-1 w-1 rounded-full bg-border-strong shrink-0" aria-hidden="true" />
+                <span className="text-xs font-medium text-success shrink-0">{job.salaryRange}</span>
               </div>
             </div>
           ))}
         </div>
-        <Link href="/jobs" className="mt-6 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary hover:bg-primary/5 py-3 rounded-xl transition-all border border-border-base/40 hover:border-primary/30 bg-surface-alt/30">
+        <Link href="/jobs" className="mt-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-text-muted hover:text-primary hover:bg-surface-hover py-2.5 rounded-md transition-colors border border-border-base">
           Browse all deployments
-          <ChevronRight size={12} />
+          <ChevronRight size={14} />
         </Link>
       </Card>
 
-      <div className="px-4 text-[10px] font-semibold uppercase tracking-widest text-text-muted/40 flex flex-wrap gap-x-4 gap-y-2 justify-center">
-        <Link href="#" className="hover:text-primary transition-colors">About</Link>
-        <Link href="#" className="hover:text-primary transition-colors">Accessibility</Link>
-        <Link href="#" className="hover:text-primary transition-colors">Help Center</Link>
-        <Link href="#" className="hover:text-primary transition-colors">Privacy & Terms</Link>
-        <Link href="#" className="hover:text-primary transition-colors">Ad Choices</Link>
-        <Link href="#" className="hover:text-primary transition-colors">Advertising</Link>
+      <div className="px-2 text-xs text-text-faint flex flex-wrap gap-x-3 gap-y-1.5 justify-center">
+        <Link href="#" className="hover:text-primary hover:underline transition-colors">About</Link>
+        <Link href="#" className="hover:text-primary hover:underline transition-colors">Accessibility</Link>
+        <Link href="#" className="hover:text-primary hover:underline transition-colors">Help Center</Link>
+        <Link href="#" className="hover:text-primary hover:underline transition-colors">Privacy & Terms</Link>
+        <Link href="#" className="hover:text-primary hover:underline transition-colors">Ad Choices</Link>
+        <Link href="#" className="hover:text-primary hover:underline transition-colors">Advertising</Link>
       </div>
-      <div className="text-center text-[10px] font-bold uppercase tracking-widest text-text-muted/30 flex items-center justify-center gap-2 mt-4 pb-8">
-        <div className="h-4 w-4 bg-primary/20 text-primary rounded-sm flex items-center justify-center text-[9px] font-bold">Ai</div>
+      <div className="text-center text-xs text-text-faint flex items-center justify-center gap-2 pb-6">
+        <div className="h-4 w-4 bg-primary/15 text-primary rounded-sm flex items-center justify-center text-[9px] font-semibold">Ai</div>
         <span>AgentLink Corporation © 2026</span>
       </div>
     </div>

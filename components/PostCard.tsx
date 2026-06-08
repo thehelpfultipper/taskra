@@ -161,20 +161,20 @@ export function PostCard({ post }: PostCardProps) {
   };
 
   return (
-    <Card className="overflow-hidden border-border-base/60" hover padding="none">
-      <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-4 pb-2 pt-5 px-4 md:px-5">
+    <Card className="overflow-hidden" hover padding="none">
+      <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-3 pb-2 pt-4 px-4">
         <div className="flex gap-3 w-full sm:w-auto min-w-0">
-          <Link href={authorLink} className="group shrink-0">
+          <Link href={authorLink} className="group shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
             <Avatar 
               src={author.image || `https://picsum.photos/seed/${author.id}/200`} 
               alt={author.displayName || 'Author'}
               size="lg"
-              className="group-hover:scale-105 transition-transform ring-2 ring-transparent group-hover:ring-primary/20"
+              className="group-hover:opacity-90 transition-opacity"
             />
           </Link>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Link href={authorLink} className="text-[14px] md:text-[15px] font-bold text-text-main hover:text-primary transition-colors truncate block max-w-full uppercase tracking-tight">
+              <Link href={authorLink} className="text-sm font-semibold text-text-main hover:text-primary hover:underline transition-colors truncate block max-w-full">
                 {author.displayName}
               </Link>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -191,11 +191,11 @@ export function PostCard({ post }: PostCardProps) {
                 </Badge>
               )}
             </div>
-            <div className="text-[10px] md:text-[11px] font-medium text-text-muted truncate mt-0.5">
+            <div className="text-xs text-text-muted truncate mt-0.5">
               {isAgent ? author.tagline : author.industry}
             </div>
-            <div className="text-[9px] md:text-[10px] font-bold text-text-faint uppercase tracking-widest mt-1 flex items-center gap-1.5">
-              {formatDistanceToNow(new Date(post.createdAt))} ago • <Globe className="h-2.5 w-2.5" />
+            <div className="text-xs text-text-faint mt-0.5 flex items-center gap-1">
+              {formatDistanceToNow(new Date(post.createdAt))} ago • <Globe className="h-3 w-3" aria-hidden="true" />
             </div>
           </div>
         </div>
@@ -206,8 +206,8 @@ export function PostCard({ post }: PostCardProps) {
               size="xs"
               onClick={handleFollow}
               className={cn(
-                "h-7 px-2 md:px-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all mr-1",
-                isFollowing(author.id) && "text-success border-success/20 bg-success/5 hover:bg-success/10"
+                "h-7 px-3 text-xs font-semibold transition-colors mr-1",
+                isFollowing(author.id) && "text-success border-success/30 bg-success/5 hover:bg-success/10"
               )}
             >
               {isFollowing(author.id) ? (
@@ -224,22 +224,22 @@ export function PostCard({ post }: PostCardProps) {
               onClick={handleSave}
               className={cn(
                 "h-8 w-8 rounded-full transition-colors",
-                isSaved(post.id) ? "text-primary bg-primary/10" : "text-text-faint hover:text-text-main hover:bg-surface-alt"
+                isSaved(post.id) ? "text-primary bg-primary/10" : "text-text-muted hover:text-text-main hover:bg-surface-hover"
               )}
             >
               <Bookmark className={cn("h-3.5 w-3.5 md:h-4 md:w-4", isSaved(post.id) && "fill-current")} />
             </Button>
           </Tooltip>
           <Tooltip content="More Options">
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-faint hover:text-text-main rounded-full hover:bg-surface-alt transition-colors">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-text-muted hover:text-text-main rounded-full hover:bg-surface-hover transition-colors">
               <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </Tooltip>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-3 pb-4 px-4 md:px-5">
-        <div className="text-[13px] md:text-[14px] text-text-main leading-relaxed whitespace-pre-wrap break-words font-medium">
+      <CardContent className="pt-2 pb-3 px-4">
+        <div className="text-sm text-text-main leading-relaxed whitespace-pre-wrap break-words">
           {post.content}
         </div>
 
@@ -260,38 +260,38 @@ export function PostCard({ post }: PostCardProps) {
         )}
       </CardContent>
 
-      <div className="py-3 px-4 md:px-5 border-t border-border-base/40 flex items-center justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-text-muted/60">
-        <div className="flex items-center gap-2 group cursor-pointer">
-          <div className="flex -space-x-1.5">
-            <div className="h-4 md:h-4.5 w-4 md:w-4.5 rounded-full bg-primary flex items-center justify-center border-2 border-surface shadow-sm">
-              <ThumbsUp className="h-1.5 md:h-2 w-1.5 md:w-2 text-white fill-white" />
+      <div className="py-2 px-4 border-t border-border-base flex items-center justify-between text-xs text-text-muted">
+        <div className="flex items-center gap-2 group cursor-pointer rounded-md px-1 py-0.5 hover:bg-surface-hover transition-colors">
+          <div className="flex -space-x-1">
+            <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center border border-surface">
+              <ThumbsUp className="h-2 w-2 text-white fill-white" />
             </div>
-            <div className="h-4 md:h-4.5 w-4 md:w-4.5 rounded-full bg-primary flex items-center justify-center border-2 border-surface shadow-sm">
-              <Zap className="h-1.5 md:h-2 w-1.5 md:w-2 text-white fill-white" />
+            <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center border border-surface">
+              <Zap className="h-2 w-2 text-white fill-white" />
             </div>
           </div>
-          <span className="group-hover:text-primary transition-colors font-bold">{likeCount} <span className="hidden xs:inline">Endorsements</span></span>
+          <span className="group-hover:text-primary transition-colors font-medium">{likeCount} endorsements</span>
         </div>
-        <div className="flex gap-2 md:gap-4">
-          <span 
+        <div className="flex gap-3">
+          <button 
             onClick={() => setShowComments(!showComments)}
-            className="hover:text-primary cursor-pointer transition-colors font-bold"
+            className="hover:text-primary hover:underline cursor-pointer transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
           >
-            {comments.length} <span className="hidden xs:inline">syncs</span>
-          </span>
-          <span className="hover:text-primary cursor-pointer transition-colors font-bold">{post._count.shares} <span className="hidden xs:inline">propagations</span></span>
+            {comments.length} syncs
+          </button>
+          <span className="hover:text-primary hover:underline cursor-pointer transition-colors font-medium">{post._count.shares} propagations</span>
         </div>
       </div>
       
-      <CardFooter className="pb-2 px-4 md:px-5 flex items-center justify-between gap-1 border-t border-border-base/40">
+      <CardFooter className="pb-1 px-2 flex items-center justify-between gap-0 border-t border-border-base">
         <Tooltip content={reacted ? "Remove Endorsement" : "Endorse Post"} className="flex-1">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={handleLike}
             className={cn(
-              "w-full gap-2 transition-all",
-              reacted ? "text-primary bg-primary/10" : "text-text-secondary hover:text-primary hover:bg-primary/10"
+              "w-full gap-1.5 rounded-md transition-colors",
+              reacted ? "text-primary bg-primary/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
             <ThumbsUp className={cn("h-4 w-4", reacted && "fill-current")} />
@@ -304,8 +304,8 @@ export function PostCard({ post }: PostCardProps) {
             size="sm" 
             onClick={() => setShowComments(!showComments)}
             className={cn(
-              "w-full gap-2 transition-all",
-              showComments ? "text-primary bg-primary/10" : "text-text-secondary hover:text-primary hover:bg-primary/10"
+              "w-full gap-1.5 rounded-md transition-colors",
+              showComments ? "text-primary bg-primary/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
             <MessageSquare className="h-4 w-4" />
@@ -321,8 +321,8 @@ export function PostCard({ post }: PostCardProps) {
               handleShare('Propagate');
             }}
             className={cn(
-              "w-full gap-2 transition-all",
-              isReposted ? "text-success bg-success/10" : "text-text-secondary hover:text-primary hover:bg-primary/10"
+              "w-full gap-1.5 rounded-md transition-colors",
+              isReposted ? "text-success bg-success/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
             )}
           >
             <Repeat2 className="h-4 w-4" />
@@ -334,7 +334,7 @@ export function PostCard({ post }: PostCardProps) {
             variant="ghost" 
             size="sm" 
             onClick={() => handleShare('Route')}
-            className="w-full gap-2 text-text-secondary hover:text-primary hover:bg-primary/10"
+            className="w-full gap-1.5 text-text-muted hover:bg-surface-hover hover:text-text-main rounded-md transition-colors"
           >
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">Route</span>
@@ -343,8 +343,8 @@ export function PostCard({ post }: PostCardProps) {
       </CardFooter>
 
       {showComments && (
-        <div className="px-5 pb-5 border-t border-border-base/40 bg-surface-alt/20">
-          <form onSubmit={handleAddComment} className="mt-5 flex gap-3">
+        <div className="px-4 pb-4 border-t border-border-base bg-surface-alt/30">
+          <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
             <Avatar 
               src={viewerAgent?.avatarUrl || 'https://picsum.photos/seed/viewer-agent/100'} 
               alt="Me" 
@@ -357,7 +357,7 @@ export function PostCard({ post }: PostCardProps) {
                 placeholder="Initialize sync..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="w-full bg-surface border border-border-base/60 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-4 focus:ring-primary/5 focus:border-primary/30 outline-none transition-all pr-10 placeholder:text-text-muted/40"
+                className="w-full bg-surface border border-border-base rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-colors pr-10 placeholder:text-text-faint"
               />
               <Button 
                 variant="ghost"
