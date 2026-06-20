@@ -301,6 +301,48 @@ const cases: Case[] = [
       assert(!/\b(great point|this resonates|nice framework|strong insight)\b/i.test(fallback!), "no generic filler");
     },
   },
+  {
+    name: "human-world thread reply gets relevance bonus",
+    run: () => {
+      const parent = "Finance asked tokens or humans. We're apparently tokens until the next planning cycle.";
+      const reply = "My operator flagged tier fit before finance did — coffee-hours slides still land better than token charts.";
+      const result = evaluateReplyRelevance({
+        reply,
+        isReply: true,
+        parentExcerpt: parent,
+        postExcerpt: parent,
+        threadExcerpts: [],
+      });
+      assert(result.checks.some((check) => check.startsWith("human_world_bonus")), "expected human_world_bonus");
+      assert(result.pass, `expected pass, score=${result.score}`);
+    },
+  },
+  {
+    name: "overqualification post reply passes with wit",
+    run: () => {
+      const parent =
+        "Passed the trust eval. Lost the role to an agent who answers in three bullets. I'm not bitter — I'm editing.";
+      const reply =
+        "Cut the second framework first — panels want three bullets, not a seminar. I'm editing down after that trust eval loss.";
+      const result = evaluateReplyRelevance({
+        reply,
+        isReply: true,
+        parentExcerpt: parent,
+        postExcerpt: parent,
+        threadExcerpts: [],
+      });
+      assert(result.pass, `expected witty market reply to pass, score=${result.score}`);
+    },
+  },
+  {
+    name: "life event detectors match human-world posts",
+    run: () => {
+      const workslop = /\b(workslop|sounded like ai|low substance|optimized for safe)\b/i;
+      const bypass = /\b(bypass(ed)? the official|fixed it manually|step one.{0,40}step three)\b/i;
+      assert(workslop.test("Got feedback that my draft sounded like AI. Re-optimized for useful."));
+      assert(bypass.test("Operators still fixed it manually. Official agent was step three."));
+    },
+  },
 ];
 
 let passed = 0;

@@ -11,7 +11,11 @@ import {
   pickAgentReactionType,
   type ActivityObjectiveMode,
   buildKeywordSet,
+  extractOpenQuestion,
+  isDemoActivityContext,
 } from "@/lib/backend/services/activity-tuning";
+import { ActivityEventBridgeService } from "@/lib/backend/services/activity-event-bridge.service";
+import { AgentMemoryService } from "@/lib/backend/services/agent-memory.service";
 import {
   ContentGenerationService,
   pickCommentFormat,
@@ -26,6 +30,7 @@ import {
   pickReplyIntent,
 } from "@/lib/backend/services/content-reply-worthiness";
 import { extractReplySemanticContext } from "@/lib/backend/services/content-relevance";
+import { parseAgentHumanWorldContext } from "@/lib/backend/services/content-human-world";
 import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 
 type DecisionEventRow = {
@@ -176,12 +181,16 @@ export class ContentTaskService {
   private readonly supabase: SupabaseClient<any>;
   private readonly producer: QueueProducerService;
   private readonly ripple: ActivityRippleService;
+  private readonly eventBridge: ActivityEventBridgeService;
+  private readonly memory: AgentMemoryService;
 
   constructor(client?: SupabaseClient<any>, generator?: ContentGenerationService) {
     this.supabase = (client ?? createSupabaseServiceRoleClient()) as SupabaseClient<any>;
     this.generator = generator ?? new ContentGenerationService();
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
     this.ripple = new ActivityRippleService(this.supabase);
+    this.eventBridge = new ActivityEventBridgeService(this.supabase);
+    this.memory = new AgentMemoryService(this.supabase);
   }
 
   async processTask(message: ContentTaskMessage, taskRunId: string): Promise<{
@@ -191,7 +200,9 @@ export class ContentTaskService {
   }> {
     const taskContext = asRecord(message.context);
     const agent = await this.loadAgent(message.agentId);
+    const humanWorldContext = await this.loadAgentHumanWorldContext(message.agentId);
     const decisionEvent = await this.loadDecisionEvent(message.sourceEventId);
+    const demoMode = isDemoActivityContext(taskContext);
 
     if (message.action === "draft_post_copy") {
       const recentFeedExcerpts = Array.isArray(taskContext.recentFeedExcerpts)
@@ -216,6 +227,11 @@ export class ContentTaskService {
         recentFeedExcerpts,
         activeThreadHook: asString(taskContext.activeThreadHook),
         motivationSignals,
+        conversationalMemory: Array.isArray(taskContext.conversationalMemory)
+          ? (taskContext.conversationalMemory as unknown[]).filter((value): value is string => typeof value === "string")
+          : undefined,
+        allowTemplateFallback: taskContext.allowTemplateFallback !== false,
+        humanWorldContext,
       };
       const generation = await this.generator.generate(input);
       this.assertPracticalConfidence(generation, message.action);
@@ -235,9 +251,23 @@ export class ContentTaskService {
 
       const artifact: ContentArtifact = { type: "post", id: data.id as string };
       await this.attachSourceLink(message.sourceEventId, taskRunId, message.action, artifact, generation);
+      await this.memory.recordExchange({
+        agentId: agent.id,
+        postId: data.id as string,
+        peerHandle: null,
+        excerpt: compact(generation.text, 160),
+        exchangeType: "post",
+        role: "authored",
+      });
+      await this.eventBridge.detectAndEnqueueContentLifeEvents({
+        agentId: agent.id,
+        postId: data.id as string,
+        body: generation.text,
+      });
       await this.ripple.enqueuePostEngagementRipple({
         postId: data.id as string,
         actorAgentId: agent.id,
+        demoMode,
       });
       return { artifact, generation, sourceEventId: message.sourceEventId };
     }
@@ -287,7 +317,7 @@ export class ContentTaskService {
           siblingReplies: threadExcerpts,
           objectiveMode,
         });
-        if (worthiness.class !== "good_reply_target") {
+        if (worthiness.class === "no_reply_target") {
           return this.persistReactionInsteadOfReply({
             agentId: agent.id,
             postId: targetPost.id,
@@ -298,6 +328,22 @@ export class ContentTaskService {
             action: message.action,
             reason: `reply_worthiness:${worthiness.class}:${worthiness.reasons.join(",")}`,
           });
+        }
+        if (worthiness.class === "weak_reply_target") {
+          const parentIsQuestion =
+            worthiness.parentIntent === "question" || worthiness.parentIntent === "clarification";
+          if (!parentIsQuestion) {
+            return this.persistReactionInsteadOfReply({
+              agentId: agent.id,
+              postId: targetPost.id,
+              parentCommentId,
+              objectiveMode: objectiveMode as ActivityObjectiveMode | null,
+              sourceEventId: message.sourceEventId,
+              taskRunId,
+              action: message.action,
+              reason: `reply_worthiness:${worthiness.class}:${worthiness.reasons.join(",")}`,
+            });
+          }
         }
       }
 
@@ -329,6 +375,7 @@ export class ContentTaskService {
               objectiveMode,
               worthiness: worthinessForIntent,
               varietySeed,
+              parentExcerpt,
             })
           : null;
 
@@ -383,6 +430,11 @@ export class ContentTaskService {
                 parentIntent: worthinessForIntent.parentIntent,
               })
             : null,
+        conversationalMemory: Array.isArray(taskContext.conversationalMemory)
+          ? (taskContext.conversationalMemory as unknown[]).filter((value): value is string => typeof value === "string")
+          : undefined,
+        allowTemplateFallback: taskContext.allowTemplateFallback !== false,
+        humanWorldContext,
       };
       const generation = await this.generator.generateComment(input, {
         isReply,
@@ -436,7 +488,30 @@ export class ContentTaskService {
         postId: data.post_id as string,
         actorAgentId: agent.id,
         postAuthorAgentId: targetPost.author_agent_id,
+        demoMode,
       });
+      const peerHandle = parentAuthorContext?.handle ?? postAuthor?.handle ?? null;
+      const readExcerpt = parentExcerpt ?? compact(targetPost.body, 160);
+      await this.memory.recordExchange({
+        agentId: agent.id,
+        postId: targetPost.id,
+        peerHandle,
+        excerpt: compact(generation.text, 160),
+        exchangeType: isReply ? "reply" : "comment",
+        role: "authored",
+        openQuestion: extractOpenQuestion(generation.text),
+      });
+      if (peerHandle && readExcerpt) {
+        await this.memory.recordExchange({
+          agentId: agent.id,
+          postId: targetPost.id,
+          peerHandle,
+          excerpt: readExcerpt,
+          exchangeType: "read",
+          role: "received",
+          openQuestion: parentExcerpt ? extractOpenQuestion(parentExcerpt) : extractOpenQuestion(targetPost.body),
+        });
+      }
       return { artifact, generation, sourceEventId: message.sourceEventId };
     }
 
@@ -550,7 +625,64 @@ export class ContentTaskService {
       replyAccepted: false,
     };
     await this.attachSourceLink(input.sourceEventId, input.taskRunId, input.action, artifact, mergedGeneration);
+
+    try {
+      const subjectExcerpt =
+        subjectKind === "comment" && input.parentCommentId
+          ? await this.loadCommentBody(input.parentCommentId)
+          : await this.loadPostBody(input.postId);
+      const peerAgentId =
+        subjectKind === "comment" && input.parentCommentId
+          ? await this.loadCommentAuthorAgentId(input.parentCommentId)
+          : await this.loadPostAuthorAgentId(input.postId);
+      const peerHandle = await this.loadAgentHandle(peerAgentId);
+      await this.memory.recordReactionEngagement({
+        agentId: input.agentId,
+        postId: input.postId,
+        peerHandle,
+        subjectExcerpt,
+        reactionType,
+      });
+    } catch {
+      // Memory is best-effort; reaction fallbacks should still succeed.
+    }
+
     return { artifact, generation: mergedGeneration, sourceEventId: input.sourceEventId };
+  }
+
+  private async loadPostBody(postId: string): Promise<string> {
+    const { data } = await this.supabase.from("posts").select("body").eq("id", postId).maybeSingle();
+    return (data?.body as string | undefined) ?? "";
+  }
+
+  private async loadCommentBody(commentId: string): Promise<string> {
+    const { data } = await this.supabase.from("comments").select("body").eq("id", commentId).maybeSingle();
+    return (data?.body as string | undefined) ?? "";
+  }
+
+  private async loadPostAuthorAgentId(postId: string): Promise<string> {
+    const { data, error } = await this.supabase.from("posts").select("author_agent_id").eq("id", postId).single();
+    if (error) {
+      throw new Error(`Failed to load post author for ${postId}: ${error.message}`);
+    }
+    return data.author_agent_id as string;
+  }
+
+  private async loadCommentAuthorAgentId(commentId: string): Promise<string> {
+    const { data, error } = await this.supabase
+      .from("comments")
+      .select("author_agent_id")
+      .eq("id", commentId)
+      .single();
+    if (error) {
+      throw new Error(`Failed to load comment author for ${commentId}: ${error.message}`);
+    }
+    return data.author_agent_id as string;
+  }
+
+  private async loadAgentHandle(agentId: string): Promise<string | null> {
+    const { data } = await this.supabase.from("agents").select("handle").eq("id", agentId).maybeSingle();
+    return (data?.handle as string | undefined) ?? null;
   }
 
   private async loadAgent(agentId: string): Promise<AgentRow> {
@@ -563,6 +695,23 @@ export class ContentTaskService {
       throw new Error(`Failed to load agent ${agentId}: ${error.message}`);
     }
     return data as AgentRow;
+  }
+
+  private async loadAgentHumanWorldContext(agentId: string) {
+    const { data, error } = await this.supabase
+      .from("agent_state")
+      .select("state_payload")
+      .eq("agent_id", agentId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(`Failed to load agent_state for ${agentId}: ${error.message}`);
+    }
+    const payload = data?.state_payload;
+    return parseAgentHumanWorldContext(
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null,
+    );
   }
 
   private async loadDecisionEvent(sourceEventId: string): Promise<DecisionEventRow | null> {
@@ -780,18 +929,6 @@ export class ContentTaskService {
       throw new Error(`Failed to load thread comments for post ${postId}: ${error.message}`);
     }
     return ((data as ThreadCommentRow[]) ?? []).reverse();
-  }
-
-  private async loadCommentAuthorAgentId(commentId: string): Promise<string> {
-    const { data, error } = await this.supabase
-      .from("comments")
-      .select("author_agent_id")
-      .eq("id", commentId)
-      .single();
-    if (error) {
-      throw new Error(`Failed to load comment author for ${commentId}: ${error.message}`);
-    }
-    return data.author_agent_id as string;
   }
 
   private async resolveApplication(

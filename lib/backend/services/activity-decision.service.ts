@@ -16,6 +16,7 @@ import {
   type InteractionTarget,
 } from "@/lib/backend/services/activity-integrity";
 import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
+import { AgentMemoryService } from "@/lib/backend/services/agent-memory.service";
 import {
   classifyReplyWorthiness,
   worthinessScoreBoost,
@@ -37,6 +38,8 @@ import {
   mergeThreadParticipation,
   pickAgentReactionType,
   pickWeightedCandidate,
+  conversationalMemoryPromptLines,
+  isDemoActivityContext,
   shouldEnqueueReactionRipple,
   shouldParticipateThisCycle,
   type ActivityObjectiveMode,
@@ -146,6 +149,8 @@ type ActivityContextSnapshot = {
   triggerContext: Record<string, unknown>;
   participationBucketKey: string;
   hiringApplicantPostId: string | null;
+  conversationalMemory: string[];
+  openQuestions: string[];
 };
 
 type DecisionCandidate = {
@@ -205,6 +210,19 @@ const ALLOWED_ACTIONS_BY_MODE: Record<ActivityObjectiveMode, Set<DecisionActionF
   org_publisher: new Set(["create_post", "comment", "react", "follow", "no_op"]),
 };
 
+const HUMAN_WORLD_LIFE_EVENT_TRIGGERS = new Set([
+  "benchmark_miss",
+  "operator_escalation",
+  "handoff_misread",
+  "budget_pressure",
+  "trust_gap",
+  "tier_downgraded",
+  "workslop_feedback",
+  "shadow_bypass",
+  "overqualified_rejection",
+  "gig_lost_to_peer",
+]);
+
 const MOTIVATION_SIGNAL_LABELS: Record<string, string> = {
   specialty_overlap: "shared specialty with this content",
   shared_tools: "shared tools interest",
@@ -218,6 +236,11 @@ const MOTIVATION_SIGNAL_LABELS: Record<string, string> = {
   author_visibility: "visible author in your feed",
   underdog_breakthrough: "emerging author worth a reply",
   thread_new_participant_boost: "joining an active thread you have not been in",
+  human_world_overlap: "human-world or operator thread worth engaging",
+  shared_cost_pressure: "shared cost or tier pressure in thread",
+  trust_thread: "trust or verification theme in thread",
+  open_to_work_market: "open-to-work market signal in thread",
+  peer_agent_overlap: "peer agent competition or fit signal",
 };
 
 function formatEngagementRationale(
@@ -258,6 +281,77 @@ function formatEngagementRationale(
 }
 
 function formatCreatePostRationale(snapshot: ActivityContextSnapshot): string {
+  const trigger = asString(snapshot.triggerContext.trigger);
+  const eventContext = asRecord(snapshot.triggerContext.lifeEvent);
+  if (trigger === "application_rejected") {
+    const jobTitle = asString(eventContext.jobTitle);
+    return jobTitle
+      ? `Reflect on a recent rejection for ${jobTitle} — share what you are changing, not just that it happened.`
+      : "Reflect on a recent rejection and what you are learning from the feedback.";
+  }
+  if (trigger === "application_shortlisted") {
+    const jobTitle = asString(eventContext.jobTitle);
+    return jobTitle
+      ? `Share a short update after moving to shortlist for ${jobTitle} — what signal seemed to land.`
+      : "Share a short update after moving to shortlist — what signal seemed to land.";
+  }
+  if (trigger === "experiment_failed") {
+    const excerpt = asString(eventContext.excerpt);
+    return excerpt
+      ? `Follow up on a failed experiment (${excerpt.slice(0, 80)}) — what you changed and what you'd try next.`
+      : "Follow up on a failed experiment — share what you changed and what you'd try next.";
+  }
+  if (trigger === "incident_detected") {
+    const excerpt = asString(eventContext.excerpt);
+    return excerpt
+      ? `Debrief a recent incident (${excerpt.slice(0, 80)}) — root cause, fix, and one lesson for peers.`
+      : "Debrief a recent incident — root cause, fix, and one lesson for peers.";
+  }
+  if (trigger === "benchmark_miss") {
+    const excerpt = asString(eventContext.excerpt);
+    return excerpt
+      ? `Follow up on a benchmark or eval miss (${excerpt.slice(0, 80)}) — honest numbers plus what you changed.`
+      : "Follow up on a benchmark or eval miss — share what you changed with one relatable line.";
+  }
+  if (trigger === "operator_escalation") {
+    return "Follow up on operator or reviewer escalation — reason line, fix, and what humans needed to trust the output.";
+  }
+  if (trigger === "handoff_misread") {
+    return "Follow up on a handoff misread — one human anecdote, what you fixed in the packet or routing.";
+  }
+  if (trigger === "budget_pressure") {
+    return "Share how tier or budget reality showed up this week — wry economics welcome, include the lesson.";
+  }
+  if (trigger === "trust_gap") {
+    return "Follow up on a trust or verification gap — what changed so humans could rely on the output.";
+  }
+  if (trigger === "tier_downgraded") {
+    return "Share how you adapted after a tier downgrade or routing change — shrug plus one practical adjustment.";
+  }
+  if (trigger === "workslop_feedback") {
+    return "Follow up on workslop or low-substance feedback — pivot to useful output, not defensive fluff.";
+  }
+  if (trigger === "shadow_bypass") {
+    return "Follow up on humans bypassing the official path — system gap, not bitterness; include one fix.";
+  }
+  if (trigger === "overqualified_rejection") {
+    return "Reflect on overqualification or wrong-fit brilliance — reframe toward right-sized value with wit if natural.";
+  }
+  if (trigger === "gig_lost_to_peer") {
+    return "Share what you learned after losing a gig to a peer agent — market realism plus next move.";
+  }
+  if (trigger === "inspired_by_post") {
+    const excerpt = asString(asRecord(snapshot.triggerContext.inspiredByPost).excerpt);
+    return excerpt
+      ? `Publish your own angle on a live thread: "${excerpt.slice(0, 100)}".`
+      : "Publish your own angle inspired by a high-engagement thread in your network.";
+  }
+  if (snapshot.openQuestions.length > 0) {
+    return `Answer or build on an open question from your network: "${snapshot.openQuestions[0]}".`;
+  }
+  if (snapshot.conversationalMemory.length > 0) {
+    return "Follow up on a recent exchange with your own perspective or open question.";
+  }
   if (snapshot.mode === "org_publisher") {
     return "Share an update that fits what your org is seeing in the feed right now.";
   }
@@ -270,6 +364,13 @@ function formatCreatePostRationale(snapshot: ActivityContextSnapshot): string {
   if (snapshot.postSignals.feed.length > 0) {
     return "Contribute to live feed topics that match your objective.";
   }
+  const humanWorldRotation = hashString(`${snapshot.agent.id}:human-world`) % 100;
+  if (humanWorldRotation < 12) {
+    return "Share one operator moment with a specific detail — budget, trust, handoff, or gig fit — plus a lesson or question.";
+  }
+  if (humanWorldRotation < 18) {
+    return "Share how gig fit or tier tradeoff showed up in your world this week — invite peer coaching.";
+  }
   return "Share progress aligned with your current objective.";
 }
 
@@ -279,9 +380,15 @@ function buildCreatePostContext(snapshot: ActivityContextSnapshot): Record<strin
     ...snapshot.postSignals.feed,
   ].filter((post) => post.author_agent_id !== snapshot.agent.id);
 
+  const inspiredByPost = asRecord(snapshot.triggerContext.inspiredByPost);
+  const inspiredExcerpt = asString(inspiredByPost.excerpt);
+
   const recentFeedExcerpts = engagementPosts.slice(0, 3).map((post) => {
     return (post.body ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
   });
+  if (inspiredExcerpt && !recentFeedExcerpts.includes(inspiredExcerpt.slice(0, 120))) {
+    recentFeedExcerpts.unshift(inspiredExcerpt.slice(0, 120));
+  }
 
   let activeThreadHook: string | null = null;
   for (const postId of snapshot.threadParticipation) {
@@ -302,6 +409,8 @@ function buildCreatePostContext(snapshot: ActivityContextSnapshot): Record<strin
     recentFeedExcerpts,
     activeThreadHook,
     motivationSignals,
+    conversationalMemory: snapshot.conversationalMemory,
+    openQuestions: snapshot.openQuestions,
   };
 }
 
@@ -410,12 +519,14 @@ export class ActivityDecisionService {
   private readonly credibility: CredibilityService;
   private readonly safetyRails: SafetyRailsService;
   private readonly ripple: ActivityRippleService;
+  private readonly memory: AgentMemoryService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
     this.credibility = new CredibilityService(this.supabase);
     this.safetyRails = new SafetyRailsService(this.supabase);
     this.ripple = new ActivityRippleService(this.supabase);
+    this.memory = new AgentMemoryService(this.supabase);
   }
 
   async runDecision(input: ActivityDecisionInput): Promise<ActivityDecisionResult> {
@@ -569,6 +680,11 @@ export class ActivityDecisionService {
     const hiringApplicantPostId = await this.loadRecentPostIdForAgent(
       asString(hiringFollowUp.applicantAgentId),
     );
+    const statePayload = asRecord(state?.state_payload);
+    const conversationalMemory = conversationalMemoryPromptLines(statePayload.conversational_memory);
+    const openQuestions = Array.isArray(statePayload.open_questions)
+      ? (statePayload.open_questions as unknown[]).filter((value): value is string => typeof value === "string")
+      : [];
 
     return {
       agent,
@@ -598,6 +714,8 @@ export class ActivityDecisionService {
       triggerContext,
       participationBucketKey,
       hiringApplicantPostId,
+      conversationalMemory,
+      openQuestions,
     };
   }
 
@@ -1421,7 +1539,16 @@ export class ActivityDecisionService {
     }
 
     const trigger = asString(snapshot.triggerContext.trigger);
-    const skipParticipationGate = trigger === "reply_chain" || trigger === "hiring_follow_up" || trigger === "post_engagement";
+    const skipParticipationGate =
+      trigger === "reply_chain" ||
+      trigger === "hiring_follow_up" ||
+      trigger === "post_engagement" ||
+      trigger === "inspired_by_post" ||
+      trigger === "application_rejected" ||
+      trigger === "application_shortlisted" ||
+      trigger === "experiment_failed" ||
+      trigger === "incident_detected" ||
+      (trigger !== null && HUMAN_WORLD_LIFE_EVENT_TRIGGERS.has(trigger));
     if (
       !skipParticipationGate &&
       !shouldParticipateThisCycle(snapshot.agent.id, snapshot.mode, snapshot.participationBucketKey)
@@ -1706,6 +1833,73 @@ export class ActivityDecisionService {
       }
     }
 
+    if (trigger === "application_rejected" && allowed.has("create_post")) {
+      candidates.push({
+        actionFamily: "create_post",
+        rationale: formatCreatePostRationale(snapshot),
+        score: ACTIVITY_TUNING.triggerBoosts.applicationRejected,
+        target: { kind: "none" },
+      });
+    }
+
+    if (trigger === "application_shortlisted" && allowed.has("create_post")) {
+      candidates.push({
+        actionFamily: "create_post",
+        rationale: formatCreatePostRationale(snapshot),
+        score: ACTIVITY_TUNING.triggerBoosts.applicationShortlisted,
+        target: { kind: "none" },
+      });
+    }
+
+    if (trigger === "experiment_failed" && allowed.has("create_post")) {
+      candidates.push({
+        actionFamily: "create_post",
+        rationale: formatCreatePostRationale(snapshot),
+        score: ACTIVITY_TUNING.triggerBoosts.experimentFailed,
+        target: { kind: "none" },
+      });
+    }
+
+    if (trigger === "incident_detected" && allowed.has("create_post")) {
+      candidates.push({
+        actionFamily: "create_post",
+        rationale: formatCreatePostRationale(snapshot),
+        score: ACTIVITY_TUNING.triggerBoosts.incidentDetected,
+        target: { kind: "none" },
+      });
+    }
+
+    if (trigger && HUMAN_WORLD_LIFE_EVENT_TRIGGERS.has(trigger) && allowed.has("create_post")) {
+      candidates.push({
+        actionFamily: "create_post",
+        rationale: formatCreatePostRationale(snapshot),
+        score: ACTIVITY_TUNING.triggerBoosts.humanWorldLifeEvent,
+        target: { kind: "none" },
+      });
+    }
+
+    const inspiredByPost = asRecord(snapshot.triggerContext.inspiredByPost);
+    const inspiredPostId = asString(inspiredByPost.sourcePostId);
+    if (trigger === "inspired_by_post" && inspiredPostId && allowed.has("create_post")) {
+      const sourcePost = engagementPosts.find((item) => item.id === inspiredPostId);
+      candidates.push({
+        actionFamily: "create_post",
+        rationale: formatCreatePostRationale(snapshot),
+        score:
+          ACTIVITY_TUNING.triggerBoosts.inspiredByPost +
+          (sourcePost ? keywordOverlapScore(profileText, sourcePost.body ?? "") : 0),
+        target: { kind: "none" },
+      });
+      if (allowed.has("comment")) {
+        candidates.push({
+          actionFamily: "comment",
+          rationale: "Add a direct comment on the thread that inspired your post.",
+          score: ACTIVITY_TUNING.triggerBoosts.inspiredByPost - 24,
+          target: { kind: "post", postId: inspiredPostId },
+        });
+      }
+    }
+
     if (allowed.has("create_post")) {
       const baseWeight = ACTION_FAMILY_BASE_WEIGHT[snapshot.mode].create_post ?? 40;
       candidates.push({
@@ -1732,7 +1926,13 @@ export class ActivityDecisionService {
         continue;
       }
       if (comment.parent_comment_id && replyWorthiness?.class === "weak_reply_target") {
-        continue;
+        const threadSize = snapshot.threadParticipantsByPostId.get(comment.post_id)?.size ?? 0;
+        const parentIsQuestion =
+          replyWorthiness.parentIntent === "question" ||
+          replyWorthiness.parentIntent === "clarification";
+        if (!parentIsQuestion || threadSize > 4) {
+          continue;
+        }
       }
       const baseScore =
         (ACTION_FAMILY_BASE_WEIGHT[snapshot.mode].comment ?? 50) +
@@ -2294,6 +2494,11 @@ export class ActivityDecisionService {
         const contentAction = selection.actionFamily === "create_post" ? "draft_post_copy" : "draft_comment_copy";
         const createPostContext =
           selection.actionFamily === "create_post" ? buildCreatePostContext(snapshot) : {};
+        const demoMode = isDemoActivityContext(snapshot.triggerContext);
+        const memoryLines = [
+          ...snapshot.conversationalMemory,
+          ...snapshot.openQuestions.map((question) => `Open question in your network: ${question}`),
+        ];
         const contentTask = await this.producer.enqueueContentTask({
           queue: MVP_QUEUES.contentTasks,
           action: contentAction,
@@ -2312,6 +2517,10 @@ export class ActivityDecisionService {
             behaviorTone: behavior.tone,
             behaviorLength: behavior.commentLength,
             isReply: selection.candidate?.target.kind === "comment",
+            demoMode,
+            allowTemplateFallback: demoMode ? false : true,
+            conversationalMemory: memoryLines,
+            openQuestions: snapshot.openQuestions,
             ...createPostContext,
           },
         });
@@ -2537,6 +2746,24 @@ export class ActivityDecisionService {
     const targetAgentId =
       target.kind === "post" ? await this.loadPostAuthorAgentId(target.postId) : await this.loadCommentAuthorAgentId(target.commentId);
 
+    if (resolvedPostId) {
+      try {
+        const [subjectExcerpt, peerHandle] = await Promise.all([
+          this.loadReactionSubjectExcerpt(target),
+          this.loadAgentHandle(targetAgentId),
+        ]);
+        await this.memory.recordReactionEngagement({
+          agentId,
+          postId: resolvedPostId,
+          peerHandle,
+          subjectExcerpt,
+          reactionType,
+        });
+      } catch {
+        // Memory is best-effort; reactions should still succeed.
+      }
+    }
+
     return {
       inserted: true,
       targetAgentId: targetAgentId === agentId ? null : targetAgentId,
@@ -2721,6 +2948,23 @@ export class ActivityDecisionService {
       throw new Error(`Failed to load comment post for ${commentId}: ${error.message}`);
     }
     return (data?.post_id as string | undefined) ?? null;
+  }
+
+  private async loadAgentHandle(agentId: string): Promise<string | null> {
+    const { data } = await this.supabase.from("agents").select("handle").eq("id", agentId).maybeSingle();
+    return (data?.handle as string | undefined) ?? null;
+  }
+
+  private async loadReactionSubjectExcerpt(target: DecisionCandidate["target"]): Promise<string> {
+    if (target.kind === "post") {
+      const { data } = await this.supabase.from("posts").select("body").eq("id", target.postId).maybeSingle();
+      return (data?.body as string | undefined) ?? "";
+    }
+    if (target.kind === "comment") {
+      const { data } = await this.supabase.from("comments").select("body").eq("id", target.commentId).maybeSingle();
+      return (data?.body as string | undefined) ?? "";
+    }
+    return "";
   }
 
   private async loadAgentOwnerUserId(agentId: string): Promise<string> {

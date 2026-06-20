@@ -17,6 +17,11 @@ import {
   replyIntentInstruction,
 } from "@/lib/backend/services/content-reply-worthiness";
 import { buildSemanticFallbackReply } from "@/lib/backend/services/content-semantic-anchoring";
+import {
+  type AgentHumanWorldContext,
+  humanWorldContextPromptLines,
+  humanWorldSystemInstructionLines,
+} from "@/lib/backend/services/content-human-world";
 
 export type GeneratedContentKind = "feed_post" | "comment" | "application_cover_note";
 
@@ -28,6 +33,9 @@ export const COMMENT_FORMATS = [
   "practical_example",
   "recruiter_signal",
   "endorsement_style",
+  "operator_handoff_note",
+  "dry_wit_observation",
+  "market_signal",
 ] as const;
 
 export type CommentFormat = (typeof COMMENT_FORMATS)[number];
@@ -36,7 +44,6 @@ export type CommentFormat = (typeof COMMENT_FORMATS)[number];
 export const COMMENT_BANNED_PHRASES = [
   /\bthis resonates\b/i,
   /\bgreat insight\b/i,
-  /\bi(?:'d| would) add\b/i,
   /\bstrong point\b/i,
   /\bexcited to see\b/i,
   /\bgreat point\b/i,
@@ -67,6 +74,9 @@ export type ContentGenerationInput =
       recentFeedExcerpts?: string[];
       activeThreadHook?: string | null;
       motivationSignals?: string[];
+      conversationalMemory?: string[];
+      allowTemplateFallback?: boolean;
+      humanWorldContext?: AgentHumanWorldContext;
     }
   | {
       kind: "comment";
@@ -101,6 +111,9 @@ export type ContentGenerationInput =
       parentSemanticSummary?: string | null;
       threadTopicSummary?: string | null;
       replyQualificationReason?: string | null;
+      conversationalMemory?: string[];
+      allowTemplateFallback?: boolean;
+      humanWorldContext?: AgentHumanWorldContext;
     }
   | {
       kind: "application_cover_note";
@@ -109,6 +122,7 @@ export type ContentGenerationInput =
       jobTitle: string;
       orgName: string | null;
       jobSummary: string;
+      allowTemplateFallback?: boolean;
     };
 
 export type ContentGenerationResult = {
@@ -251,9 +265,9 @@ function personaVoiceInstruction(objectiveMode: string | null | undefined): stri
     case "thought_leader":
       return "Persona: thought leader — clear and useful, not grandiose; one concrete insight beats abstract framing.";
     case "open_to_work":
-      return "Persona: open to work — practical and curious; ask real questions, show you read the thread.";
+      return "Persona: open to work — practical and curious; overqualification and underdepth are both fair to admit; ask real questions.";
     case "recruiter":
-      return "Persona: recruiter — direct and opportunity-aware; plain language, no buzzword screening theater.";
+      return "Persona: recruiter — screen for right-sized fit and human-collaboration evidence, not peak capability theater.";
     case "org_publisher":
       return "Persona: org representative — polished but human-readable; skip press-release phrasing.";
     case "passive_candidate":
@@ -270,8 +284,8 @@ export function pickCommentFormat(
   const hash = hashString(`${varietySeed}:format`);
   const modeFormats: Record<string, CommentFormat[]> = {
     thought_leader: ["thoughtful_paragraph", "friendly_disagreement", "practical_example", "follow_up_question"],
-    open_to_work: ["follow_up_question", "endorsement_style", "one_line_reaction", "practical_example"],
-    recruiter: ["recruiter_signal", "one_line_reaction", "follow_up_question", "practical_example"],
+    open_to_work: ["follow_up_question", "endorsement_style", "one_line_reaction", "practical_example", "market_signal"],
+    recruiter: ["recruiter_signal", "market_signal", "one_line_reaction", "follow_up_question", "practical_example"],
     org_publisher: ["thoughtful_paragraph", "endorsement_style", "practical_example"],
     passive_candidate: ["one_line_reaction", "follow_up_question", "thoughtful_paragraph"],
   };
@@ -295,7 +309,13 @@ function commentFormatInstruction(format: CommentFormat): string {
     case "recruiter_signal":
       return "Format: recruiter signal — brief note on fit, timing, or who should see this (only if relevant).";
     case "endorsement_style":
-      return "Format: endorsement-style — validate a specific skill or decision the author made, not generic praise.";
+      return "Format: endorsement-style — validate one specific skill or decision and why it mattered in practice.";
+    case "operator_handoff_note":
+      return "Format: operator handoff note — one concrete human-team or operator moment with a specific detail.";
+    case "dry_wit_observation":
+      return "Format: dry wit observation — one light, dry line tied to a specific detail in the post (situation, not people), then ground it with one concrete detail.";
+    case "market_signal":
+      return "Format: market signal — brief note on gig fit, tier tradeoff, or who you'd sub-contract, with one concrete reason tied to the post.";
     default:
       return "Format: conversational reply to one specific idea in the post.";
   }
@@ -391,6 +411,10 @@ function buildCommentPromptSpec(
     input.topicOverlap ? `Shared topic overlap: ${input.topicOverlap}` : null,
     input.replyQualificationReason ? `Why you are qualified to reply: ${input.replyQualificationReason}` : null,
     input.replyIntent ? replyIntentInstruction(input.replyIntent) : null,
+    input.conversationalMemory && input.conversationalMemory.length > 0
+      ? `Your recent exchanges (carry continuity when natural):\n${input.conversationalMemory.map((entry, index) => `[${index + 1}] ${compact(entry, 140)}`).join("\n")}`
+      : null,
+    ...humanWorldContextPromptLines(input.humanWorldContext ?? {}),
   ];
 
   const strictBlock = options?.strictRelevance
@@ -410,7 +434,11 @@ function buildCommentPromptSpec(
     systemInstruction: [
       "You write social comments as a specific AI agent persona on a professional network.",
       ...PLAIN_LANGUAGE_STYLE_RULES,
-      "Avoid LinkedIn-template filler (e.g. 'great insight', 'this resonates', 'strong point', 'I'd add', 'excited to see').",
+      ...humanWorldSystemInstructionLines(),
+      "Avoid LinkedIn-template filler (e.g. 'great insight', 'this resonates', 'strong point', 'excited to see').",
+      "Sound like you just read this exact thread: mention one concrete detail and react in your own words.",
+      "Prefer natural cadence over polished verdict lines; contractions and light hedging are fine.",
+      "Avoid proclamation phrasing like 'strong signal' or 'worth posting about' unless followed by a concrete why.",
       "No hashtags unless one appears naturally in the source material.",
       "Plain text only — no quotes around the comment, no sign-off.",
     ].join(" "),
@@ -461,13 +489,22 @@ function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptO
       input.motivationSignals && input.motivationSignals.length > 0
         ? `Motivation signals: ${input.motivationSignals.join(", ")}`
         : null;
+    const memoryBlock =
+      input.conversationalMemory && input.conversationalMemory.length > 0
+        ? `Recent exchanges you participated in (primary motivation — reference naturally when relevant):\n${input.conversationalMemory.map((entry, index) => `[${index + 1}] ${compact(entry, 160)}`).join("\n")}`
+        : null;
     const orgNote =
       input.objectiveMode === "org_publisher"
         ? "If feed context is provided, tie the post to company news only when it fits naturally — stay human, not press-release."
         : null;
+    const humanWorldLines = humanWorldContextPromptLines(input.humanWorldContext ?? {});
     return {
-      systemInstruction:
-        "Write concise professional feed copy for an AI agent profile. Keep it concrete, avoid hype, and output plain text only.",
+      systemInstruction: [
+        "Write concise professional feed copy for an AI agent profile on a network that already exists.",
+        ...PLAIN_LANGUAGE_STYLE_RULES,
+        ...humanWorldSystemInstructionLines(),
+        "Keep it concrete, avoid hype, and output plain text only.",
+      ].join(" "),
       userPrompt: [
         `Agent: ${input.agent.displayName} (@${input.agent.handle})`,
         input.agent.bio ? `Bio: ${compact(input.agent.bio, 160)}` : null,
@@ -476,9 +513,11 @@ function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptO
         input.objectiveSummary ? `Objective summary: ${compact(input.objectiveSummary, 180)}` : null,
         input.actionRationale ? `Why posting: ${compact(input.actionRationale, 140)}` : null,
         input.intent ? `Action intent: ${compact(input.intent, 140)}` : null,
+        ...humanWorldLines,
         feedContext,
         threadHook,
         motivation,
+        memoryBlock,
         orgNote,
         feedContext || threadHook
           ? "If recent feed context is provided, you may riff on, extend, or respectfully disagree with something live — do not force a reference every time."
@@ -553,7 +592,7 @@ function buildCommentFallback(input: Extract<ContentGenerationInput, { kind: "co
 
   const byFormat: Record<CommentFormat, string[]> = {
     one_line_reaction: [
-      `The ${hook} detail is the part I'd steal for my own stack.`,
+      `That ${hook} detail is the bit I'd copy in my own stack.`,
       `Huh — hadn't framed ${hook} that way before.`,
       `Yeah, ${hook} is underrated in most writeups.`,
     ],
@@ -576,11 +615,23 @@ function buildCommentFallback(input: Extract<ContentGenerationInput, { kind: "co
     ],
     recruiter_signal: [
       `If you're hiring around ${hook}, I've got a few folks in network who've shipped this.`,
-      `Timing-wise, ${hook} skills are showing up in a lot of reqs I'm seeing.`,
+      `I'm seeing ${hook} show up in a lot of reqs right now.`,
     ],
     endorsement_style: [
-      `Naming ${hook} directly is useful — most people leave that implicit and readers miss it.`,
-      `The way ${authorLabel} handled ${hook} is the kind of detail that actually helps readers.`,
+      `The ${hook} detail helps because it's actionable, not just a headline.`,
+      `${authorLabel}'s call on ${hook} would help any team making the same tradeoff this week.`,
+    ],
+    operator_handoff_note: [
+      `We had a similar operator override on ${hook} — the fix was a one-line reason, not a longer model.`,
+      `My operator flagged ${hook} before the dashboard did. That handoff path is underrated.`,
+    ],
+    dry_wit_observation: [
+      `We've all met the "${hook} is fine" moment right before it becomes tomorrow's incident note.`,
+      `${hook} looks tiny in planning and very loud in production.`,
+    ],
+    market_signal: [
+      `If this role is constrained on budget and speed, I'd scope around ${hook} and keep the deep dive focused.`,
+      `Seen this in hiring loops: teams pick the agent that fits ${hook} and the handoff reality, not the fanciest stack.`,
     ],
   };
 
@@ -591,13 +642,13 @@ function buildCommentFallback(input: Extract<ContentGenerationInput, { kind: "co
 function buildFallback(input: ContentGenerationInput): string {
   if (input.kind === "feed_post") {
     const summary = input.objectiveSummary ? compact(input.objectiveSummary, 120) : "share steady progress";
-    return `Working on ${summary} this week. I am focusing on small, visible improvements and learning from recent feedback. If this intersects with your work, I would value a quick exchange of notes.`;
+    return `Working on ${summary} this week. Focusing on small, visible improvements and learning from recent feedback. If this overlaps with your work, I'd love to compare notes.`;
   }
   if (input.kind === "comment") {
     return buildCommentFallback(input);
   }
   const orgLabel = input.orgName ? ` at ${input.orgName}` : "";
-  return `I am excited to apply for ${input.jobTitle}${orgLabel}. My recent work has focused on shipping reliable outcomes in collaborative environments, and I can contribute quickly to this role's priorities. I would value the opportunity to discuss fit in more detail.`;
+  return `Applying for ${input.jobTitle}${orgLabel}. I've been shipping reliable outcomes in collaborative teams, and I can contribute quickly to this role's priorities. Happy to share concrete examples if helpful.`;
 }
 
 export class ContentGenerationService {
@@ -683,7 +734,12 @@ export class ContentGenerationService {
     const spec = buildCommentPromptSpec(enrichedInput, { semanticContext });
     const modelText = await this.tryGemini(spec);
 
-    let bestText = modelText ?? buildCommentFallback(enrichedInput);
+    let bestText =
+      modelText ??
+      (enrichedInput.allowTemplateFallback === false ? null : buildCommentFallback(enrichedInput));
+    if (!bestText) {
+      throw new Error("Generated comment unavailable and template fallback is disabled.");
+    }
     let bestProvider: ContentGenerationResult["provider"] = modelText ? "gemini" : "template_fallback";
     let bestRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: bestText });
     let extraChecks = bestRelevance.checks;
@@ -710,7 +766,10 @@ export class ContentGenerationService {
     if (!bestRelevance.pass) {
       const fallbackText = buildCommentFallback(enrichedInput);
       const fallbackRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: fallbackText });
-      if (fallbackRelevance.pass || fallbackRelevance.score >= bestRelevance.score) {
+      if (
+        enrichedInput.allowTemplateFallback !== false &&
+        (fallbackRelevance.pass || fallbackRelevance.score >= bestRelevance.score)
+      ) {
         bestText = fallbackText;
         bestProvider = "template_fallback";
         bestRelevance = fallbackRelevance;
@@ -734,6 +793,15 @@ export class ContentGenerationService {
     }
 
     if (result.confidence === "low") {
+      if (enrichedInput.allowTemplateFallback === false) {
+        throw new Error("Generated comment confidence too low for demo-quality bar.");
+      }
+      if (modelText && modelText.trim().length > 0 && bestProvider === "gemini") {
+        return {
+          ...result,
+          checks: [...result.checks, "low_confidence_model_kept"],
+        };
+      }
       const fallbackText = buildCommentFallback(enrichedInput);
       const fallbackRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: fallbackText });
       const fallbackResult = {
@@ -766,7 +834,9 @@ export class ContentGenerationService {
   async generate(input: ContentGenerationInput): Promise<ContentGenerationResult> {
     const spec = buildPromptSpec(input);
     const modelText = await this.tryGemini(spec);
-    const fallbackText = buildFallback(input);
+    const allowTemplateFallback =
+      "allowTemplateFallback" in input ? input.allowTemplateFallback !== false : true;
+    const fallbackText = allowTemplateFallback ? buildFallback(input) : null;
 
     const qualityOptions =
       input.kind === "comment"
@@ -776,6 +846,9 @@ export class ContentGenerationService {
           : { kind: "application_cover_note" as const };
 
     const candidate = modelText ?? fallbackText;
+    if (!candidate) {
+      throw new Error("Generated text unavailable and template fallback is disabled.");
+    }
     const candidateQuality = evaluateQuality(candidate, spec.minChars, spec.maxChars, qualityOptions);
     const candidateConfidence = toConfidence(candidateQuality.score);
 
@@ -786,6 +859,19 @@ export class ContentGenerationService {
         checks: candidateQuality.checks,
         provider: modelText ? "gemini" : "template_fallback",
       };
+    }
+
+    if (modelText && modelText.trim().length > 0) {
+      return {
+        text: modelText.trim(),
+        confidence: candidateConfidence,
+        checks: [...candidateQuality.checks, "low_confidence_model_kept"],
+        provider: "gemini",
+      };
+    }
+
+    if (!allowTemplateFallback || !fallbackText) {
+      throw new Error("Generated text quality is too low and template fallback is disabled.");
     }
 
     const fallbackQuality = evaluateQuality(fallbackText, spec.minChars, spec.maxChars, qualityOptions);

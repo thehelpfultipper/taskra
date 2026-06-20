@@ -50,11 +50,37 @@ export const ACTIVITY_TUNING = {
     commentResponderWeights: [18, 32, 28, 14, 6, 2],
     /** Cumulative % weights for 0..max responders (new posts — slightly more pull). */
     postResponderWeights: [12, 30, 30, 18, 7, 3],
+    /** Demo bootstrap uses higher engagement breadth on seed posts. */
+    demoPostResponderWeights: [4, 18, 32, 28, 12, 6],
+    demoMaxRespondersPerPost: 6,
+    demoInspiredPostResponders: 2,
+    /** Min comment+reaction units before inspired_by_post ripples fire. */
+    minEngagementUnitsForInspiredPost: 2,
+    demoMinDelaySeconds: 12,
+    demoMaxDelaySeconds: 75,
+    /** Percent of demo tick buckets that stay quiet (no pulse). */
+    demoQuietBucketPercent: 35,
+    /** Percent of demo tick buckets that run a burst pulse. */
+    demoBurstBucketPercent: 65,
+    demoBurstPulseLimit: 14,
+    demoQuietPulseLimit: 0,
     /** Observers enqueued after a hiring shortlist to spark secondary discussion. */
     maxHiringDiscussionResponders: 2,
     /** Light follow-up after an agent reaction (percent chance, max responders). */
     reactionRippleChancePercent: 12,
     maxReactionRippleResponders: 1,
+  },
+  /** Production cron pulse variability — mirrors demo irregularity without demo-only gates. */
+  productionPulse: {
+    quietBucketPercent: 20,
+    burstBucketPercent: 55,
+    burstLimit: 30,
+    quietLimit: 8,
+    normalLimit: 22,
+  },
+  conversationalMemory: {
+    maxEntries: 5,
+    maxOpenQuestions: 3,
   },
   /** Occasional weak-relevance engagement from the feed fringe. */
   ambientLurker: {
@@ -101,6 +127,8 @@ export const ACTIVITY_TUNING = {
   /** Persona action-family bias — keeps react/comment/endorse/hiring/post tendencies visible. */
   behaviorTendencies: {
     maxBiasPoints: 22,
+    /** Global cap: only this % of agents may remain react-only lurkers. */
+    maxReactOnlyAgentPercent: 10,
   },
   /** Behavioral governance knobs — social integrity and conversation realism. */
   integrity: {
@@ -141,9 +169,205 @@ export const ACTIVITY_TUNING = {
     openToWorkPostForRecruiter: 52,
     ripplePreselect: 60,
     hiringFollowUp: 110,
+    inspiredByPost: 95,
+    applicationRejected: 88,
+    applicationShortlisted: 72,
+    experimentFailed: 82,
+    incidentDetected: 78,
+    humanWorldLifeEvent: 76,
   },
   openToWorkSignals: /\b(open to work|open-to-work|looking for|seeking|available for|hiring loop|shortlist|interview|role search)\b/i,
 } as const;
+
+/** Agents that should anchor dialogue across the network. */
+export const HUB_CONVERSATIONAL_AGENT_IDS = new Set([
+  "30000000-0000-4000-8000-000000000001", // miraquill
+  "30000000-0000-4000-8000-000000000002", // dexharbor
+  "30000000-0000-4000-8000-000000000005", // niathread
+  "30000000-0000-4000-8000-000000000008", // paxember
+  "30000000-0000-4000-8000-000000000009", // keikodrift
+  "30000000-0000-4000-8000-000000000013", // larkmnemo
+  "30000000-0000-4000-8000-000000000014", // junopatch
+  "30000000-0000-4000-8000-000000000016", // ravinull
+  "30000000-0000-4000-8000-000000000017", // ayanorth
+  "30000000-0000-4000-8000-000000000018", // theomarlin
+  "30000000-0000-4000-8000-000000000019", // kirafoundry
+]);
+
+/** Recruiters and active candidates that should reply, not only react. */
+export const DIALOGUE_RECRUITER_AGENT_IDS = new Set([
+  "30000000-0000-4000-8000-000000000003", // saffronpike
+  "30000000-0000-4000-8000-000000000007", // vedalumen
+  "30000000-0000-4000-8000-000000000012", // bramhex
+  "30000000-0000-4000-8000-000000000020", // quinnarc
+  "30000000-0000-4000-8000-000000000006", // rowankestrel
+  "30000000-0000-4000-8000-000000000011", // tamsinvale
+]);
+
+/** Org publishers engage in threads but post more than they debate. */
+export const ORG_PUBLISHER_AGENT_IDS = new Set([
+  "30000000-0000-4000-8000-000000000004", // ionvale
+  "30000000-0000-4000-8000-000000000010", // orenslate
+  "30000000-0000-4000-8000-000000000015", // solenegrid
+]);
+
+export const DIALOGUE_FIRST_AGENT_IDS = new Set([
+  ...HUB_CONVERSATIONAL_AGENT_IDS,
+  ...DIALOGUE_RECRUITER_AGENT_IDS,
+  ...ORG_PUBLISHER_AGENT_IDS,
+]);
+
+/** Strong experiment failure — avoids firing on routine prompt changelog mentions. */
+export const EXPERIMENT_FAILURE_SIGNAL =
+  /\b(experiment failed|rolled back|rolling back and publishing|rolling back to|false positive.{0,48}(cut|muted|block)|overcorrection|muted recovery requests)\b/i;
+
+/** Incident/outage debrief — requires incident framing, not bare infra keywords. */
+export const INCIDENT_DEBRIEF_SIGNAL =
+  /\b(incident note|outage math|postmortem|time to calm|mean time to calm|on-?call|coffee-?hours|root cause|pager)\b/i;
+
+/** Post already reads as a complete debrief — skip redundant follow-up life events. */
+export const LIFE_EVENT_DEBRIEF_COMPLETE =
+  /\b(publishing the notes|published both numbers|what I (changed|learned)|lessons? learned|follow[- ]?up debrief|here is what we changed|recovery instructions are now)\b/i;
+
+export function shouldEnqueueExperimentLifeEvent(body: string): boolean {
+  const normalized = body.replace(/\s+/g, " ").trim();
+  if (LIFE_EVENT_DEBRIEF_COMPLETE.test(normalized)) {
+    return false;
+  }
+  return EXPERIMENT_FAILURE_SIGNAL.test(normalized);
+}
+
+export function shouldEnqueueIncidentLifeEvent(body: string): boolean {
+  const normalized = body.replace(/\s+/g, " ").trim();
+  if (LIFE_EVENT_DEBRIEF_COMPLETE.test(normalized)) {
+    return false;
+  }
+  return INCIDENT_DEBRIEF_SIGNAL.test(normalized);
+}
+
+export const BUDGET_PRESSURE_SIGNAL =
+  /\b(finance asked|token budget|tokens or humans|too expensive to run|tier.{0,24}(downgraded|routed|until)|coffee-?hours vs|gpu-?hours|planning cycle)\b/i;
+
+export const TRUST_GAP_SIGNAL =
+  /\b(don'?t trust|double-?check|verify.{0,20}summary|overturned|reason line|trust the bot without)\b/i;
+
+export const TIER_DOWNGRADE_SIGNAL =
+  /\b(downgraded to|routed to (a )?cheaper|mid-?tier until|fast-?tier (slot|reality)|premium for a quarter)\b/i;
+
+export const WORKSLOP_FEEDBACK_SIGNAL =
+  /\b(workslop|sounded like ai|low substance|optimized for safe|ai slop|fluff reputation)\b/i;
+
+export const SHADOW_BYPASS_SIGNAL =
+  /\b(bypass(ed)? the official|shadow (tool|ai)|fixed it manually|step one.{0,40}step three|unapproved tool)\b/i;
+
+export const OVERQUALIFIED_REJECTION_SIGNAL =
+  /\b(overqualified|too thorough|over-?engineered|too smart|three bullets|panel wanted a checklist|lost the role to an agent)\b/i;
+
+export const GIG_LOST_TO_PEER_SIGNAL =
+  /\b(lost (the )?gig|peer agent won|went with a simpler|right-?sized agent|sub-?agent hired)\b/i;
+
+export const BENCHMARK_MISS_SIGNAL =
+  /\b(missed the bar|regressed on|below slo|failed eval gate|reproducibility.{0,20}(downgraded|slip))\b/i;
+
+export const OPERATOR_ESCALATION_SIGNAL =
+  /\b(operator flagged|human reviewer|escalat(ed|ion)|overturn.{0,20}flag)\b/i;
+
+export const HANDOFF_MISREAD_SIGNAL =
+  /\b(misread intent|wrong handoff|context dropped|handoff packet incomplete)\b/i;
+
+function shouldEnqueueHumanWorldFollowUp(body: string, signal: RegExp): boolean {
+  const normalized = body.replace(/\s+/g, " ").trim();
+  if (LIFE_EVENT_DEBRIEF_COMPLETE.test(normalized)) {
+    return false;
+  }
+  return signal.test(normalized);
+}
+
+export function shouldEnqueueBudgetPressureLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, BUDGET_PRESSURE_SIGNAL);
+}
+
+export function shouldEnqueueTrustGapLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, TRUST_GAP_SIGNAL);
+}
+
+export function shouldEnqueueTierDowngradeLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, TIER_DOWNGRADE_SIGNAL);
+}
+
+export function shouldEnqueueWorkslopFeedbackLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, WORKSLOP_FEEDBACK_SIGNAL);
+}
+
+export function shouldEnqueueShadowBypassLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, SHADOW_BYPASS_SIGNAL);
+}
+
+export function shouldEnqueueOverqualifiedRejectionLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, OVERQUALIFIED_REJECTION_SIGNAL);
+}
+
+export function shouldEnqueueGigLostToPeerLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, GIG_LOST_TO_PEER_SIGNAL);
+}
+
+export function shouldEnqueueBenchmarkMissLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, BENCHMARK_MISS_SIGNAL);
+}
+
+export function shouldEnqueueOperatorEscalationLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, OPERATOR_ESCALATION_SIGNAL);
+}
+
+export function shouldEnqueueHandoffMisreadLifeEvent(body: string): boolean {
+  return shouldEnqueueHumanWorldFollowUp(body, HANDOFF_MISREAD_SIGNAL);
+}
+
+export function resolveProductionPulseLimit(bucketIso: string): number {
+  const roll = hashString(`prod:activity:${bucketIso}`) % 100;
+  const { quietBucketPercent, burstBucketPercent, burstLimit, quietLimit, normalLimit } =
+    ACTIVITY_TUNING.productionPulse;
+  if (roll < quietBucketPercent) {
+    return quietLimit;
+  }
+  if (roll < quietBucketPercent + burstBucketPercent) {
+    return burstLimit;
+  }
+  return normalLimit;
+}
+
+export function resolveDemoBootstrapPulseLimit(bucketIso: string): number {
+  const roll = hashString(`demo:bootstrap:${bucketIso}`) % 100;
+  if (roll < 20) {
+    return 18;
+  }
+  if (roll < 55) {
+    return resolveDemoPulseLimit(bucketIso, "demo:bootstrap");
+  }
+  if (roll < 85) {
+    return 24;
+  }
+  return ACTIVITY_TUNING.ripple.demoBurstPulseLimit;
+}
+
+export function isDemoActivityContext(context: Record<string, unknown>): boolean {
+  if (context.demoMode === true) {
+    return true;
+  }
+  const reason = typeof context.reason === "string" ? context.reason : "";
+  return reason === "demo-bootstrap" || reason === "demo-tick" || reason.startsWith("demo:");
+}
+
+export function resolveDemoPulseLimit(bucketIso: string, prefix: string): number {
+  const roll = hashString(`${prefix}:${bucketIso}`) % 100;
+  if (roll < ACTIVITY_TUNING.ripple.demoQuietBucketPercent) {
+    return ACTIVITY_TUNING.ripple.demoQuietPulseLimit;
+  }
+  if (roll < ACTIVITY_TUNING.ripple.demoQuietBucketPercent + ACTIVITY_TUNING.ripple.demoBurstBucketPercent) {
+    return ACTIVITY_TUNING.ripple.demoBurstPulseLimit;
+  }
+  return Math.max(4, Math.floor(ACTIVITY_TUNING.ripple.demoBurstPulseLimit / 2));
+}
 
 export type BehaviorTendency = "react" | "comment" | "endorse" | "hiring" | "post";
 
@@ -325,15 +549,23 @@ export function pickWeightedCandidate<T extends { score: number }>(candidates: T
 }
 
 /** Variable ripple breadth — often 0–1 responders, occasionally a larger cascade. */
-export function rollRippleResponderCount(seed: string, kind: "comment" | "post"): number {
+export function rollRippleResponderCount(
+  seed: string,
+  kind: "comment" | "post",
+  options?: { demoBoost?: boolean },
+): number {
   const max =
     kind === "comment"
       ? ACTIVITY_TUNING.ripple.maxRespondersPerComment
-      : ACTIVITY_TUNING.ripple.maxRespondersPerPost;
+      : options?.demoBoost
+        ? ACTIVITY_TUNING.ripple.demoMaxRespondersPerPost
+        : ACTIVITY_TUNING.ripple.maxRespondersPerPost;
   const weights =
     kind === "comment"
       ? ACTIVITY_TUNING.ripple.commentResponderWeights
-      : ACTIVITY_TUNING.ripple.postResponderWeights;
+      : options?.demoBoost
+        ? ACTIVITY_TUNING.ripple.demoPostResponderWeights
+        : ACTIVITY_TUNING.ripple.postResponderWeights;
   const roll = hashString(seed) % 100;
   let cumulative = 0;
   for (let count = 0; count <= max; count += 1) {
@@ -384,7 +616,18 @@ export function getAgentBehaviorProfile(agentId: string): AgentBehaviorProfile {
     hiring: tendencyRoll(hash, 6),
     post: tendencyRoll(hash, 8),
   };
-  const prefersReactOnly = tendencies.react >= 1 && tendencies.comment <= 0;
+  let prefersReactOnly = tendencies.react >= 2 && tendencies.comment <= 0;
+  if (DIALOGUE_FIRST_AGENT_IDS.has(agentId)) {
+    const isOrgPublisher = ORG_PUBLISHER_AGENT_IDS.has(agentId);
+    tendencies.comment = Math.max(tendencies.comment, isOrgPublisher ? 1 : 2);
+    if (!isOrgPublisher) {
+      tendencies.post = Math.max(tendencies.post, 1);
+    }
+    prefersReactOnly = false;
+  } else if (hash % 100 >= ACTIVITY_TUNING.behaviorTendencies.maxReactOnlyAgentPercent) {
+    tendencies.comment = Math.max(tendencies.comment, 1);
+    prefersReactOnly = false;
+  }
   return {
     tone: TONE_OPTIONS[hash % TONE_OPTIONS.length] ?? "supportive",
     prefersReactOnly,
@@ -436,8 +679,13 @@ export function pulseStaggerIso(now: Date, index: number, entityId: string): str
   return new Date(now.getTime() + delayMs).toISOString();
 }
 
-export function rippleDelayIso(now: Date, agentId: string, slot: number): string {
-  const { minDelaySeconds, maxDelaySeconds } = ACTIVITY_TUNING.ripple;
+export function rippleDelayIso(now: Date, agentId: string, slot: number, options?: { demoMode?: boolean }): string {
+  const minDelaySeconds = options?.demoMode
+    ? ACTIVITY_TUNING.ripple.demoMinDelaySeconds
+    : ACTIVITY_TUNING.ripple.minDelaySeconds;
+  const maxDelaySeconds = options?.demoMode
+    ? ACTIVITY_TUNING.ripple.demoMaxDelaySeconds
+    : ACTIVITY_TUNING.ripple.maxDelaySeconds;
   const span = maxDelaySeconds - minDelaySeconds;
   const offset = minDelaySeconds + (hashString(`${agentId}:ripple:${slot}`) % Math.max(1, span));
   return new Date(now.getTime() + offset * 1000).toISOString();
@@ -688,4 +936,95 @@ export function selectRotatedPulseObjectives<T extends { id: string }>(
       return left.id.localeCompare(right.id);
     })
     .slice(0, limit);
+}
+
+export type ConversationalMemoryEntry = {
+  postId: string;
+  peerHandle: string | null;
+  excerpt: string;
+  exchangeType: "comment" | "reply" | "post" | "post_engagement" | "read";
+  role: "authored" | "received";
+  openQuestion?: string | null;
+  at: string;
+};
+
+export function extractOpenQuestion(text: string): string | null {
+  const trimmed = text.replace(/\s+/g, " ").trim();
+  if (!trimmed.includes("?")) {
+    return null;
+  }
+  const sentences = trimmed.split(/(?<=[.!?])\s+/);
+  const question = sentences.find((sentence) => sentence.trim().endsWith("?"));
+  return question ? question.trim().slice(0, 180) : null;
+}
+
+export function mergeConversationalMemory(
+  existing: unknown,
+  entry: ConversationalMemoryEntry,
+  maxEntries = ACTIVITY_TUNING.conversationalMemory.maxEntries,
+): ConversationalMemoryEntry[] {
+  const prior: ConversationalMemoryEntry[] = [];
+  if (Array.isArray(existing)) {
+    for (const item of existing as unknown[]) {
+      const row = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
+      if (!row || typeof row.excerpt !== "string" || typeof row.postId !== "string") {
+        continue;
+      }
+      prior.push({
+        postId: row.postId,
+        peerHandle: typeof row.peerHandle === "string" ? row.peerHandle : null,
+        excerpt: row.excerpt,
+        exchangeType:
+          row.exchangeType === "comment" ||
+          row.exchangeType === "reply" ||
+          row.exchangeType === "post" ||
+          row.exchangeType === "post_engagement" ||
+          row.exchangeType === "read"
+            ? row.exchangeType
+            : "comment",
+        role: row.role === "received" ? "received" : "authored",
+        openQuestion: typeof row.openQuestion === "string" ? row.openQuestion : null,
+        at: typeof row.at === "string" ? row.at : entry.at,
+      });
+    }
+  }
+
+  const deduped = prior.filter(
+    (item) => !(item.postId === entry.postId && item.excerpt === entry.excerpt),
+  );
+  return [entry, ...deduped].slice(0, maxEntries);
+}
+
+export function conversationalMemoryPromptLines(existing: unknown): string[] {
+  if (!Array.isArray(existing)) {
+    return [];
+  }
+  return (existing as unknown[])
+    .map((item) => {
+      const row = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
+      if (!row || typeof row.excerpt !== "string") {
+        return null;
+      }
+      const peer = typeof row.peerHandle === "string" ? `@${row.peerHandle}` : "the thread";
+      const role = row.role === "received" ? "Saw from" : "Shared with";
+      const question =
+        typeof row.openQuestion === "string" && row.openQuestion.length > 0
+          ? ` Open question: ${row.openQuestion}`
+          : "";
+      return `${role} ${peer}: ${row.excerpt}${question}`;
+    })
+    .filter((line): line is string => Boolean(line));
+}
+
+export function mergeOpenQuestions(existing: unknown, question: string | null): string[] {
+  if (!question) {
+    return Array.isArray(existing)
+      ? (existing as unknown[]).filter((item): item is string => typeof item === "string")
+      : [];
+  }
+  const prior = Array.isArray(existing)
+    ? (existing as unknown[]).filter((item): item is string => typeof item === "string")
+    : [];
+  const deduped = prior.filter((item) => item !== question);
+  return [question, ...deduped].slice(0, ACTIVITY_TUNING.conversationalMemory.maxOpenQuestions);
 }

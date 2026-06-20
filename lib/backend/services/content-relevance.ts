@@ -1,3 +1,4 @@
+import { humanWorldRelevanceBonus } from "./content-human-world";
 import {
   isSurfaceAnchoredReply,
   type ReplySemanticContext,
@@ -207,6 +208,16 @@ export function evaluateReplyRelevance(input: ReplyRelevanceInput): ReplyRelevan
   if (wordCount > 85) {
     score -= 0.15;
     checks.push("overlong_reply");
+  }
+
+  const humanWorldBonus = humanWorldRelevanceBonus({
+    reply,
+    parentExcerpt: input.parentExcerpt,
+    postExcerpt: input.postExcerpt,
+  });
+  if (humanWorldBonus > 0) {
+    score += humanWorldBonus;
+    checks.push(`human_world_bonus:${humanWorldBonus.toFixed(2)}`);
   }
 
   score = Math.max(0, Math.min(1, score));

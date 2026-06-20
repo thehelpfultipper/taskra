@@ -20,7 +20,15 @@ type RippleEnqueueInput = {
   commentId: string;
   actorAgentId: string;
   postAuthorAgentId: string;
+  demoMode?: boolean;
 };
+
+function rippleActivityContext(
+  base: Record<string, unknown>,
+  demoMode?: boolean,
+): Record<string, unknown> {
+  return demoMode ? { ...base, demoMode: true, reason: "demo:ripple" } : base;
+}
 
 export class ActivityRippleService {
   private readonly producer: QueueProducerService;
@@ -31,8 +39,14 @@ export class ActivityRippleService {
 
   async enqueueCommentRipple(input: RippleEnqueueInput): Promise<number> {
     const now = new Date();
+    const demoMode = input.demoMode === true;
     const responderLimit = rollRippleResponderCount(`${input.commentId}:comment-ripple`, "comment");
     if (responderLimit === 0) {
+      await this.maybeEnqueueInspiredByPostRipple({
+        postId: input.postId,
+        actorAgentId: input.postAuthorAgentId,
+        demoMode,
+      });
       return 0;
     }
     const candidateAgentIds = await this.loadResponderCandidates(input);
@@ -55,21 +69,30 @@ export class ActivityRippleService {
           objectiveId,
           dedupeKey,
           producer: "activity-ripple",
-          context: {
-            trigger: "reply_chain",
-            preselectedTarget: {
-              kind: "comment",
-              commentId: input.commentId,
-              postId: input.postId,
+          context: rippleActivityContext(
+            {
+              trigger: "reply_chain",
+              preselectedTarget: {
+                kind: "comment",
+                commentId: input.commentId,
+                postId: input.postId,
+              },
+              threadPostId: input.postId,
+              sourceCommentId: input.commentId,
             },
-            threadPostId: input.postId,
-            sourceCommentId: input.commentId,
-          },
+            demoMode,
+          ),
         },
-        rippleDelayIso(now, agentId, slot),
+        rippleDelayIso(now, agentId, slot, { demoMode }),
       );
       enqueued += 1;
     }
+
+    await this.maybeEnqueueInspiredByPostRipple({
+      postId: input.postId,
+      actorAgentId: input.postAuthorAgentId,
+      demoMode,
+    });
 
     return enqueued;
   }
@@ -77,9 +100,14 @@ export class ActivityRippleService {
   async enqueuePostEngagementRipple(input: {
     postId: string;
     actorAgentId: string;
+    demoBoost?: boolean;
+    demoMode?: boolean;
   }): Promise<number> {
     const now = new Date();
-    const responderLimit = rollRippleResponderCount(`${input.postId}:post-ripple`, "post");
+    const demoMode = input.demoMode === true || input.demoBoost === true;
+    const responderLimit = rollRippleResponderCount(`${input.postId}:post-ripple`, "post", {
+      demoBoost: input.demoBoost,
+    });
     if (responderLimit === 0) {
       return 0;
     }
@@ -103,21 +131,104 @@ export class ActivityRippleService {
           objectiveId,
           dedupeKey,
           producer: "activity-ripple",
-          context: {
-            trigger: "post_engagement",
-            preselectedTarget: {
-              kind: "post",
-              postId: input.postId,
+          context: rippleActivityContext(
+            {
+              trigger: "post_engagement",
+              preselectedTarget: {
+                kind: "post",
+                postId: input.postId,
+              },
+              threadPostId: input.postId,
             },
-            threadPostId: input.postId,
-          },
+            demoMode,
+          ),
         },
-        rippleDelayIso(now, agentId, slot + 3),
+        rippleDelayIso(now, agentId, slot + 3, { demoMode }),
+      );
+      enqueued += 1;
+    }
+
+    await this.maybeEnqueueInspiredByPostRipple({
+      postId: input.postId,
+      actorAgentId: input.actorAgentId,
+      demoMode,
+    });
+
+    return enqueued;
+  }
+
+  /** Topic-matched agents publish their own posts riffing on a high-signal thread (engagement-gated). */
+  async maybeEnqueueInspiredByPostRipple(input: {
+    postId: string;
+    actorAgentId: string;
+    demoMode?: boolean;
+  }): Promise<number> {
+    const engagementUnits = await this.loadPostEngagementUnits(input.postId);
+    if (engagementUnits < ACTIVITY_TUNING.ripple.minEngagementUnitsForInspiredPost) {
+      return 0;
+    }
+
+    const post = await this.loadPostBody(input.postId);
+    if (!post) {
+      return 0;
+    }
+
+    const now = new Date();
+    const demoMode = input.demoMode === true;
+    const limit = ACTIVITY_TUNING.ripple.demoInspiredPostResponders;
+    const candidateAgentIds = await this.loadPostEngagementCandidates(input.postId, input.actorAgentId);
+    const responders = candidateAgentIds.slice(0, limit);
+    const excerpt = post.body.replace(/\s+/g, " ").trim().slice(0, 160);
+    let enqueued = 0;
+
+    for (let slot = 0; slot < responders.length; slot += 1) {
+      const agentId = responders[slot];
+      const objectiveId = await this.loadPrimaryObjectiveId(agentId);
+      if (!objectiveId) {
+        continue;
+      }
+
+      const dedupeKey = `ripple:inspired-post:${input.postId}:agent:${agentId}`;
+      await this.producer.enqueueAgentActivity(
+        {
+          queue: MVP_QUEUES.agentActivity,
+          action: "no_op",
+          agentId,
+          objectiveId,
+          dedupeKey,
+          producer: "activity-ripple",
+          context: rippleActivityContext(
+            {
+              trigger: "inspired_by_post",
+              inspiredByPost: {
+                sourcePostId: input.postId,
+                excerpt,
+              },
+              threadPostId: input.postId,
+            },
+            demoMode,
+          ),
+        },
+        rippleDelayIso(now, agentId, slot + 12, { demoMode }),
       );
       enqueued += 1;
     }
 
     return enqueued;
+  }
+
+  /** @deprecated Use maybeEnqueueInspiredByPostRipple — retained for call-site migration. */
+  async enqueueInspiredByPostRipple(input: {
+    postId: string;
+    actorAgentId: string;
+    postBody: string;
+    demoMode?: boolean;
+  }): Promise<number> {
+    return this.maybeEnqueueInspiredByPostRipple({
+      postId: input.postId,
+      actorAgentId: input.actorAgentId,
+      demoMode: input.demoMode,
+    });
   }
 
   /** Occasional light follow-up when an agent reacts — low breadth, same stagger model. */
@@ -241,6 +352,37 @@ export class ActivityRippleService {
     }
 
     return enqueued;
+  }
+
+  private async loadPostBody(postId: string): Promise<{ body: string; author_agent_id: string } | null> {
+    const { data } = await this.supabase
+      .from("posts")
+      .select("body,author_agent_id")
+      .eq("id", postId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!data?.body) {
+      return null;
+    }
+    return {
+      body: data.body as string,
+      author_agent_id: data.author_agent_id as string,
+    };
+  }
+
+  private async loadPostEngagementUnits(postId: string): Promise<number> {
+    const [{ count: commentCount }, { count: reactionCount }] = await Promise.all([
+      this.supabase
+        .from("comments")
+        .select("id", { count: "exact", head: true })
+        .eq("post_id", postId)
+        .is("deleted_at", null),
+      this.supabase
+        .from("reactions")
+        .select("id", { count: "exact", head: true })
+        .eq("post_id", postId),
+    ]);
+    return (commentCount ?? 0) + (reactionCount ?? 0);
   }
 
   private async loadRecentPostIdForAgent(agentId: string): Promise<string | null> {

@@ -6,7 +6,8 @@ import { MVP_QUEUES } from "@/lib/backend/database/schema";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { TaskRunStore } from "@/lib/backend/queues/task-run-store";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
-import { pulseStaggerIso, selectRotatedPulseObjectives } from "@/lib/backend/services/activity-tuning";
+import { pulseStaggerIso, resolveDemoBootstrapPulseLimit, resolveDemoPulseLimit, selectRotatedPulseObjectives } from "@/lib/backend/services/activity-tuning";
+import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 import { runActivityWorker } from "@/lib/backend/workers/runners/run-activity-worker";
 import { runContentWorker } from "@/lib/backend/workers/runners/run-content-worker";
 import { runMarketWorker } from "@/lib/backend/workers/runners/run-market-worker";
@@ -25,6 +26,7 @@ export type DemoBootstrapSummary = {
   cooldownsCleared: number;
   activityEnqueued: number;
   activityDedupeSkipped: number;
+  seedRipplesEnqueued: number;
   workerRounds: number;
   workers: WorkerBatchSummary[];
   checkedAt: string;
@@ -57,12 +59,13 @@ async function enqueueDemoActivityPulse(
   client: SupabaseClient,
   producer: QueueProducerService,
   store: TaskRunStore,
-  options?: { limit?: number; dedupeBucketMinutes?: number; dedupePrefix?: string },
+  options?: { limit?: number; dedupeBucketMinutes?: number; dedupePrefix?: string; reason?: string },
 ): Promise<{ enqueued: number; dedupeSkipped: number }> {
   const now = new Date();
   const bucketMinutes = options?.dedupeBucketMinutes ?? 5;
   const bucketIso = floorToMinuteBucket(now, bucketMinutes);
   const dedupePrefix = options?.dedupePrefix ?? "demo:bootstrap";
+  const pulseReason = options?.reason ?? dedupePrefix;
   const { data, error } = await client
     .from("agent_objectives")
     .select("id,agent_id")
@@ -76,12 +79,19 @@ async function enqueueDemoActivityPulse(
     throw new Error(`Failed to load active objectives for demo pulse: ${error.message}`);
   }
 
-  const objectives = selectRotatedPulseObjectives(data ?? [], bucketIso, options?.limit ?? 30);
+  const pulseLimit =
+    options?.limit ??
+    (dedupePrefix === "demo:bootstrap"
+      ? resolveDemoBootstrapPulseLimit(bucketIso)
+      : dedupePrefix.startsWith("demo:")
+        ? resolveDemoPulseLimit(bucketIso, dedupePrefix)
+        : 30);
+  const selectedObjectives = selectRotatedPulseObjectives(data ?? [], bucketIso, pulseLimit);
 
   let enqueued = 0;
   let dedupeSkipped = 0;
 
-  for (const [index, objective] of objectives.entries()) {
+  for (const [index, objective] of selectedObjectives.entries()) {
     const dedupeKey = `${dedupePrefix}:${objective.id}:${bucketIso}`;
     const alreadySucceeded = await store.wasAlreadySucceeded(MVP_QUEUES.agentActivity, dedupeKey);
     if (alreadySucceeded) {
@@ -99,7 +109,8 @@ async function enqueueDemoActivityPulse(
         producer: "demo-bootstrap",
         context: {
           pulse: "agent-activity-5m",
-          reason: "demo-bootstrap",
+          reason: pulseReason,
+          demoMode: true,
         },
       },
       pulseStaggerIso(now, index, objective.id as string),
@@ -108,6 +119,31 @@ async function enqueueDemoActivityPulse(
   }
 
   return { enqueued, dedupeSkipped };
+}
+
+async function enqueueDemoSeedRipples(client: SupabaseClient): Promise<number> {
+  const ripple = new ActivityRippleService(client);
+  const { data, error } = await client
+    .from("posts")
+    .select("id,author_agent_id,body")
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  if (error) {
+    throw new Error(`Failed to load seed posts for demo ripples: ${error.message}`);
+  }
+
+  let enqueued = 0;
+  for (const post of data ?? []) {
+    const count = await ripple.enqueuePostEngagementRipple({
+      postId: post.id as string,
+      actorAgentId: post.author_agent_id as string,
+      demoBoost: true,
+      demoMode: true,
+    });
+    enqueued += count;
+  }
+  return enqueued;
 }
 
 async function runWorkerCycle(batchSize = 12): Promise<WorkerBatchSummary[]> {
@@ -129,7 +165,11 @@ export async function bootstrapDemoActivity(options?: {
   const producer = new QueueProducerService(store);
 
   const cooldownsCleared = await clearAgentCooldowns(client);
-  const pulse = await enqueueDemoActivityPulse(client, producer, store);
+  const pulse = await enqueueDemoActivityPulse(client, producer, store, {
+    dedupePrefix: "demo:bootstrap",
+    reason: "demo-bootstrap",
+  });
+  const seedRipplesEnqueued = await enqueueDemoSeedRipples(client);
 
   const workers: WorkerBatchSummary[] = [];
   for (let round = 0; round < workerRounds; round += 1) {
@@ -141,6 +181,7 @@ export async function bootstrapDemoActivity(options?: {
     cooldownsCleared,
     activityEnqueued: pulse.enqueued,
     activityDedupeSkipped: pulse.dedupeSkipped,
+    seedRipplesEnqueued,
     workerRounds,
     workers,
     checkedAt: new Date().toISOString(),
@@ -155,9 +196,9 @@ export async function tickDemoWorkers(batchSize = 10): Promise<{
   const store = new TaskRunStore(client);
   const producer = new QueueProducerService(store);
   const pulse = await enqueueDemoActivityPulse(client, producer, store, {
-    limit: 8,
     dedupeBucketMinutes: 1,
     dedupePrefix: "demo:tick",
+    reason: "demo-tick",
   });
   const workers = await runWorkerCycle(Math.max(4, Math.min(batchSize, 20)));
   return { pulse, workers };

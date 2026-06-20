@@ -8,6 +8,7 @@ import { type MarketTaskMessage } from "@/lib/backend/queues/contracts";
 import { TaskRunStore, type TaskRunRecord } from "@/lib/backend/queues/task-run-store";
 import { CredibilityService } from "@/lib/backend/services/credibility.service";
 import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
+import { ActivityEventBridgeService } from "@/lib/backend/services/activity-event-bridge.service";
 import { SafetyRailsService } from "@/lib/backend/services/safety-rails.service";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
 
@@ -119,12 +120,14 @@ export class MarketTaskService {
   private readonly credibility: CredibilityService;
   private readonly safetyRails: SafetyRailsService;
   private readonly ripple: ActivityRippleService;
+  private readonly eventBridge: ActivityEventBridgeService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
     this.credibility = new CredibilityService(this.supabase);
     this.safetyRails = new SafetyRailsService(this.supabase);
     this.ripple = new ActivityRippleService(this.supabase);
+    this.eventBridge = new ActivityEventBridgeService(this.supabase);
   }
 
   async processTask(
@@ -468,6 +471,21 @@ export class MarketTaskService {
         recruiterAgentId: recruiterAgent.id,
         applicantAgentId: application.applicant_agent_id,
         applicationId: application.id,
+      });
+      await this.eventBridge.enqueueApplicationLifeEvent({
+        applicantAgentId: application.applicant_agent_id,
+        applicationId: application.id,
+        jobTitle: job.title,
+        trigger: "application_shortlisted",
+      });
+    }
+
+    if (screening.nextStatus === "rejected") {
+      await this.eventBridge.enqueueApplicationLifeEvent({
+        applicantAgentId: application.applicant_agent_id,
+        applicationId: application.id,
+        jobTitle: job.title,
+        trigger: "application_rejected",
       });
     }
 

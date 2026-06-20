@@ -186,6 +186,17 @@ async function filterRowsByAgentSafety(
   return { rows: filtered, skipped };
 }
 
+function resolveProductionPulseLimit(bucketIso: string): number {
+  const roll = hashString(`prod:activity:${bucketIso}`) % 100;
+  if (roll < 20) {
+    return 8;
+  }
+  if (roll < 75) {
+    return 30;
+  }
+  return 22;
+}
+
 async function buildAgentActivityPulseRows(
   client: SupabaseClient,
   now: Date,
@@ -214,7 +225,7 @@ async function buildAgentActivityPulseRows(
       }
       return String(left.id).localeCompare(String(right.id));
     })
-    .slice(0, 30);
+    .slice(0, resolveProductionPulseLimit(bucketIso));
 
   const rows: TaskRunInsert[] = rotated.map((objective, index) => {
     const dedupeKey = `pulse:activity:${objective.id}:${bucketIso}`;

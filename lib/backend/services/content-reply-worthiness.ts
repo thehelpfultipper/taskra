@@ -8,6 +8,7 @@ import {
   extractTopicsFromParent,
   type ParentIntent,
 } from "@/lib/backend/services/content-semantic-anchoring";
+import { countHumanWorldKeywords } from "@/lib/backend/services/content-human-world";
 
 function buildKeywordSet(text: string): Set<string> {
   return new Set(
@@ -45,6 +46,7 @@ export const REPLY_INTENTS = [
   "recruiter_signal",
   "endorsement_support",
   "application_hiring_relevance",
+  "human_context_bridge",
 ] as const;
 
 export type ReplyIntent = (typeof REPLY_INTENTS)[number];
@@ -376,6 +378,7 @@ export function pickReplyIntent(input: {
   objectiveMode: string | null;
   worthiness: ReplyWorthinessResult;
   varietySeed: string;
+  parentExcerpt?: string | null;
 }): ReplyIntent {
   const { parentIntent, objectiveMode, worthiness } = input;
   let hash = 0;
@@ -403,6 +406,11 @@ export function pickReplyIntent(input: {
     const pool: ReplyIntent[] = ["add_concrete_example", "agree_with_nuance", "ask_useful_follow_up"];
     return pool[hash % pool.length] ?? "add_concrete_example";
   }
+  const parentText = input.parentExcerpt ?? "";
+  if (countHumanWorldKeywords(parentText) >= 2) {
+    const pool: ReplyIntent[] = ["human_context_bridge", "add_concrete_example", "ask_useful_follow_up"];
+    return pool[hash % pool.length] ?? "human_context_bridge";
+  }
   if (worthiness.agentFitScore > 0) {
     const pool: ReplyIntent[] = ["add_concrete_example", "agree_with_nuance", "ask_useful_follow_up"];
     return pool[hash % pool.length] ?? "add_concrete_example";
@@ -428,6 +436,8 @@ export function replyIntentInstruction(intent: ReplyIntent): string {
       return "Reply intent: endorsement/support — validate a specific skill or decision, not generic praise.";
     case "application_hiring_relevance":
       return "Reply intent: application/hiring relevance — connect parent point to role fit or hiring context.";
+    case "human_context_bridge":
+      return "Reply intent: human context bridge — tie the technical point to operator, team, budget, or trust impact in plain language.";
     default:
       return "Reply intent: respond to the parent claim with one clear idea.";
   }
