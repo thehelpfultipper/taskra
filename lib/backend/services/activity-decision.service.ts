@@ -17,6 +17,10 @@ import {
 } from "@/lib/backend/services/activity-integrity";
 import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 import {
+  classifyReplyWorthiness,
+  worthinessScoreBoost,
+} from "@/lib/backend/services/content-reply-worthiness";
+import {
   ACTION_COOLDOWNS_BY_MODE_SECONDS,
   ACTION_FAMILY_BASE_WEIGHT,
   ACTIVITY_OBJECTIVE_MODES,
@@ -97,6 +101,7 @@ type CommentSignal = {
   parent_comment_id: string | null;
   author_agent_id: string;
   created_at: string;
+  body?: string;
 };
 
 type JobSignal = {
@@ -879,7 +884,7 @@ export class ActivityDecisionService {
   private async loadCommentSignals(agentId: string): Promise<CommentSignal[]> {
     const { data, error } = await this.supabase
       .from("comments")
-      .select("id,post_id,parent_comment_id,author_agent_id,created_at,posts!inner(author_agent_id)")
+      .select("id,post_id,parent_comment_id,author_agent_id,created_at,body,posts!inner(author_agent_id)")
       .eq("posts.author_agent_id", agentId)
       .neq("author_agent_id", agentId)
       .is("deleted_at", null)
@@ -896,6 +901,7 @@ export class ActivityDecisionService {
       parent_comment_id: (row.parent_comment_id as string | null) ?? null,
       author_agent_id: row.author_agent_id as string,
       created_at: row.created_at as string,
+      body: (row.body as string | undefined) ?? "",
     }));
 
     return replies;
@@ -909,7 +915,7 @@ export class ActivityDecisionService {
 
     const { data, error } = await this.supabase
       .from("comments")
-      .select("id,post_id,parent_comment_id,author_agent_id,created_at")
+      .select("id,post_id,parent_comment_id,author_agent_id,created_at,body")
       .in("post_id", uniquePostIds)
       .neq("author_agent_id", agentId)
       .is("deleted_at", null)
@@ -926,6 +932,7 @@ export class ActivityDecisionService {
       parent_comment_id: (row.parent_comment_id as string | null) ?? null,
       author_agent_id: row.author_agent_id as string,
       created_at: row.created_at as string,
+      body: (row.body as string | undefined) ?? "",
     }));
   }
 
@@ -1529,9 +1536,34 @@ export class ActivityDecisionService {
         preselectedCommentId,
         commentTargets,
         engagementPosts,
+        profileText,
+        objectiveMode: snapshot.mode,
       });
 
-      if (resolvedReply && allowed.has("comment") && !isSelfInteraction(snapshot.agent.id, resolvedReply.target, integrityContext)) {
+      const rippleCommentTarget =
+        resolvedReply?.isReply && resolvedReply.target.kind === "comment" ? resolvedReply.target : null;
+      const rippleWorthiness = rippleCommentTarget
+        ? this.evaluateCommentAsReplyTarget(
+            snapshot,
+            commentTargets.find((item) => item.id === rippleCommentTarget.commentId) ?? {
+              id: rippleCommentTarget.commentId,
+              post_id: resolvedReply!.postId,
+              parent_comment_id: null,
+              author_agent_id: rippleCommentTarget.authorAgentId ?? "",
+              created_at: "",
+              body: "",
+            },
+            engagementPosts.find((item) => item.id === resolvedReply!.postId),
+            profileText,
+          )
+        : null;
+
+      if (
+        resolvedReply &&
+        allowed.has("comment") &&
+        !isSelfInteraction(snapshot.agent.id, resolvedReply.target, integrityContext) &&
+        (!resolvedReply.isReply || rippleWorthiness?.class === "good_reply_target")
+      ) {
         const post = engagementPosts.find((item) => item.id === resolvedReply.postId);
         const eligibility = evaluateEngagementEligibility({
           actionFamily: "comment",
@@ -1691,10 +1723,20 @@ export class ActivityDecisionService {
       if (behavior.prefersReactOnly && trigger !== "reply_chain") {
         continue;
       }
+      if (comment.author_agent_id === snapshot.agent.id) {
+        continue;
+      }
       const post = engagementPosts.find((item) => item.id === comment.post_id);
+      const replyWorthiness = this.evaluateCommentAsReplyTarget(snapshot, comment, post, profileText);
+      if (replyWorthiness?.class === "no_reply_target") {
+        continue;
+      }
+      if (comment.parent_comment_id && replyWorthiness?.class === "weak_reply_target") {
+        continue;
+      }
       const baseScore =
         (ACTION_FAMILY_BASE_WEIGHT[snapshot.mode].comment ?? 50) +
-        this.scoreCommentTarget(snapshot, comment, post, profileText, true);
+        this.scoreCommentTarget(snapshot, comment, post, profileText, true, replyWorthiness);
       const target: InteractionTarget = {
         kind: "comment",
         commentId: comment.id,
@@ -2047,6 +2089,8 @@ export class ActivityDecisionService {
     preselectedCommentId: string | null;
     commentTargets: CommentSignal[];
     engagementPosts: PostSignal[];
+    profileText: string;
+    objectiveMode: ActivityObjectiveMode | null;
   }):
     | {
         postId: string;
@@ -2090,8 +2134,22 @@ export class ActivityDecisionService {
           comment.id !== preselectedCommentId &&
           comment.author_agent_id !== input.agentId,
       );
-      if (siblings.length > 0) {
-        const pick = siblings[hashString(`${input.agentId}:${preselectedCommentId}:sibling`) % siblings.length]!;
+      const worthySiblings = siblings.filter((comment) => {
+        const post = input.engagementPosts.find((item) => item.id === comment.post_id);
+        const worthiness = classifyReplyWorthiness({
+          commentBody: comment.body ?? "",
+          postBody: post?.body ?? "",
+          agentProfileText: input.profileText,
+          authorAgentId: comment.author_agent_id,
+          replyingAgentId: input.agentId,
+          siblingReplies: [],
+          objectiveMode: input.objectiveMode,
+        });
+        return worthiness.class === "good_reply_target";
+      });
+      const pool = worthySiblings.length > 0 ? worthySiblings : siblings;
+      if (pool.length > 0) {
+        const pick = pool[hashString(`${input.agentId}:${preselectedCommentId}:sibling`) % pool.length]!;
         return {
           postId,
           isReply: Boolean(pick.parent_comment_id),
@@ -2149,12 +2207,33 @@ export class ActivityDecisionService {
     return score;
   }
 
+  private evaluateCommentAsReplyTarget(
+    snapshot: ActivityContextSnapshot,
+    comment: CommentSignal,
+    post: PostSignal | undefined,
+    profileText: string,
+  ) {
+    if (!comment.body?.trim()) {
+      return null;
+    }
+    return classifyReplyWorthiness({
+      commentBody: comment.body,
+      postBody: post?.body ?? "",
+      agentProfileText: profileText,
+      authorAgentId: comment.author_agent_id,
+      replyingAgentId: snapshot.agent.id,
+      siblingReplies: [],
+      objectiveMode: snapshot.mode,
+    });
+  }
+
   private scoreCommentTarget(
     snapshot: ActivityContextSnapshot,
     comment: CommentSignal,
     post: PostSignal | undefined,
     profileText: string,
     isReplyAction: boolean,
+    replyWorthiness: ReturnType<typeof classifyReplyWorthiness> | null = null,
   ): number {
     let score = 0;
     if (comment.parent_comment_id) {
@@ -2162,6 +2241,12 @@ export class ActivityDecisionService {
     }
     if (post) {
       score += this.scorePostTarget(snapshot, post, profileText);
+    }
+    if (comment.body?.trim()) {
+      score += keywordOverlapScore(profileText, comment.body);
+      if (replyWorthiness) {
+        score += worthinessScoreBoost(replyWorthiness);
+      }
     }
     if (isReplyAction && snapshot.threadParticipation.has(comment.post_id)) {
       score += ACTIVITY_TUNING.threadParticipation.reengageBoost;

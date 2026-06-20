@@ -12,6 +12,10 @@ import {
   type ReplyRelevanceInput,
   type ReplySemanticContext,
 } from "@/lib/backend/services/content-relevance";
+import {
+  type ReplyIntent,
+  replyIntentInstruction,
+} from "@/lib/backend/services/content-reply-worthiness";
 import { buildSemanticFallbackReply } from "@/lib/backend/services/content-semantic-anchoring";
 
 export type GeneratedContentKind = "feed_post" | "comment" | "application_cover_note";
@@ -92,6 +96,11 @@ export type ContentGenerationInput =
       commentFormat: CommentFormat;
       varietySeed: string;
       semanticContext?: ReplySemanticContext | null;
+      replyIntent?: ReplyIntent | null;
+      postSummary?: string | null;
+      parentSemanticSummary?: string | null;
+      threadTopicSummary?: string | null;
+      replyQualificationReason?: string | null;
     }
   | {
       kind: "application_cover_note";
@@ -107,6 +116,8 @@ export type ContentGenerationResult = {
   confidence: "high" | "medium" | "low";
   checks: string[];
   provider: "gemini" | "template_fallback";
+  /** False when a reply failed semantic validation after retry — caller should not persist as comment. */
+  replyAccepted?: boolean;
 };
 
 type PromptSpec = {
@@ -360,7 +371,12 @@ function buildCommentPromptSpec(
       ];
 
   const contextBlock = input.isReply
-    ? [`PRIORITY 2 — Root post context: ${compact(input.postExcerpt, 220)}`, threadLines ? `PRIORITY 3 — ${threadLines}` : null]
+    ? [
+        input.postSummary ? `PRIORITY 2 — Root post summary: ${input.postSummary}` : `PRIORITY 2 — Root post context: ${compact(input.postExcerpt, 220)}`,
+        input.parentSemanticSummary ? `Parent semantic summary: ${input.parentSemanticSummary}` : null,
+        input.threadTopicSummary ? `Thread topic: ${input.threadTopicSummary}` : null,
+        threadLines ? `PRIORITY 3 — ${threadLines}` : null,
+      ]
     : [threadLines ? `PRIORITY 2 — ${threadLines}` : null];
 
   const personaBlock = [
@@ -373,6 +389,8 @@ function buildCommentPromptSpec(
       : null,
     input.postAuthor?.bio ? `Author bio: ${compact(input.postAuthor.bio, 120)}` : null,
     input.topicOverlap ? `Shared topic overlap: ${input.topicOverlap}` : null,
+    input.replyQualificationReason ? `Why you are qualified to reply: ${input.replyQualificationReason}` : null,
+    input.replyIntent ? replyIntentInstruction(input.replyIntent) : null,
   ];
 
   const strictBlock = options?.strictRelevance
@@ -381,8 +399,10 @@ function buildCommentPromptSpec(
         semantic
           ? `Respond ONLY to: ${semantic.reply_target}. Parent claim: ${semantic.parent_claim}`
           : "Respond to the underlying idea in the parent comment.",
+        input.replyIntent ? `Keep reply intent: ${input.replyIntent}.` : null,
         "Do not mention bullets, lists, frameworks, phrasing, or formatting.",
         "Do not introduce a new topic. Do not repeat a point already made in the thread.",
+        "One idea. Short sentences. Concrete nouns.",
       ]
     : null;
 
@@ -404,7 +424,14 @@ function buildCommentPromptSpec(
       toneInstruction(input.behaviorTone),
       lengthInstruction(input.behaviorLength, "comment"),
       input.isReply
-        ? "Task: Write ONE reply that engages the parent claim and reply target. The reply should still make sense if the parent comment were rephrased."
+        ? [
+            "Task: Write ONE reply that engages the parent claim and reply target.",
+            input.replyIntent ? `The reply MUST match intent: ${input.replyIntent}.` : null,
+            "The reply should still make sense if the parent comment were rephrased.",
+            "One idea per reply. Short sentences. No dense abstractions unless the parent used them.",
+          ]
+            .filter(Boolean)
+            .join(" ")
         : "Task: Write ONE comment on the post. React to a specific idea; vary structure.",
     ]
       .flat()
@@ -692,26 +719,43 @@ export class ContentGenerationService {
     }
 
     const resultSpec = buildCommentPromptSpec(enrichedInput, { semanticContext });
-    const result = this.toGenerationResult(bestText, resultSpec, qualityOptions, bestProvider, extraChecks);
+    const replyAccepted = !enrichedInput.isReply || bestRelevance.pass;
+    const result = {
+      ...this.toGenerationResult(bestText, resultSpec, qualityOptions, bestProvider, extraChecks),
+      replyAccepted,
+    };
+
+    if (!replyAccepted) {
+      return {
+        ...result,
+        confidence: "low",
+        checks: [...result.checks, "relevance_rejected"],
+      };
+    }
 
     if (result.confidence === "low") {
       const fallbackText = buildCommentFallback(enrichedInput);
-      const fallbackResult = this.toGenerationResult(
-        fallbackText,
-        resultSpec,
-        qualityOptions,
-        "template_fallback",
-        [...extraChecks, "quality_fallback"],
-      );
-      if (fallbackResult.confidence !== "low") {
+      const fallbackRelevance = evaluateReplyRelevance({ ...relevanceContext, reply: fallbackText });
+      const fallbackResult = {
+        ...this.toGenerationResult(
+          fallbackText,
+          resultSpec,
+          qualityOptions,
+          "template_fallback",
+          [...extraChecks, "quality_fallback"],
+        ),
+        replyAccepted: !enrichedInput.isReply || fallbackRelevance.pass,
+      };
+      if (fallbackResult.confidence !== "low" && fallbackResult.replyAccepted) {
         return fallbackResult;
       }
-      if (
-        enrichedInput.isReply &&
-        semanticContext &&
-        (bestRelevance.checks.includes("surface_anchor") || bestRelevance.checks.includes("paraphrase_weak"))
-      ) {
-        throw new Error("Generated reply failed semantic anchoring checks after fallback.");
+      if (enrichedInput.isReply) {
+        return {
+          ...fallbackResult,
+          confidence: "low",
+          replyAccepted: false,
+          checks: [...fallbackResult.checks, "relevance_rejected"],
+        };
       }
       throw new Error("Generated comment failed quality checks after relevance guardrails.");
     }

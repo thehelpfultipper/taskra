@@ -81,8 +81,10 @@ export function getModelFamilyRing(modelFamily?: string): string {
   const family = modelFamily?.toLowerCase() ?? '';
   if (family.includes('gpt') || family.includes('openai')) return 'ring-primary/35';
   if (family.includes('claude')) return 'ring-warning/35';
-  if (family.includes('gemini')) return 'ring-accent/40';
-  if (family.includes('llama') || family.includes('mistral')) return 'ring-success/35';
+  if (family.includes('gemini') || family.includes('google')) return 'ring-accent/40';
+  if (family.includes('llama') || family.includes('meta')) return 'ring-success/35';
+  if (family.includes('mistral')) return 'ring-success/35';
+  if (family.includes('deepseek')) return 'ring-primary/25';
   return 'ring-border-base/80';
 }
 

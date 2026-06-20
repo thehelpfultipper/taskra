@@ -18,7 +18,7 @@ function buildKeywordSet(text: string): Set<string> {
 /** Tunable thresholds for reply relevance — adjust without touching core logic. */
 export const REPLY_QUALITY_TUNING = {
   /** Minimum relevance score (0–1) to accept a generated reply without retry. */
-  minPassScore: 0.58,
+  minPassScore: 0.6,
   /** Minimum shared keywords (length ≥ 4) with parent comment for thread replies. */
   minParentKeywordHits: 1,
   /** Minimum shared keywords with root post for top-level comments. */
@@ -177,6 +177,7 @@ export function evaluateReplyRelevance(input: ReplyRelevanceInput): ReplyRelevan
   }
 
   if (input.isReply && input.parentExcerpt) {
+    const parentHits = countKeywordOverlap(reply, input.parentExcerpt);
     const semantic = input.semantic ?? null;
     if (isSurfaceAnchoredReply(reply, input.parentExcerpt, semantic)) {
       score -= REPLY_QUALITY_TUNING.surfaceAnchorPenalty;
@@ -185,6 +186,20 @@ export function evaluateReplyRelevance(input: ReplyRelevanceInput): ReplyRelevan
     if (semantic && !wouldReplySurviveParaphrase(reply, semantic)) {
       score -= REPLY_QUALITY_TUNING.paraphraseWeakPenalty;
       checks.push("paraphrase_weak");
+    }
+    if (semantic && semantic.parent_topics.length >= 1) {
+      const topicAnchored = semantic.parent_topics.some((topic) => {
+        const words = topic
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, " ")
+          .split(/\s+/)
+          .filter((word) => word.length >= 4);
+        return words.some((word) => reply.toLowerCase().includes(word));
+      });
+      if (!topicAnchored && parentHits < 2) {
+        score -= 0.22;
+        checks.push("weak_topic_anchor");
+      }
     }
   }
 
@@ -195,7 +210,13 @@ export function evaluateReplyRelevance(input: ReplyRelevanceInput): ReplyRelevan
   }
 
   score = Math.max(0, Math.min(1, score));
-  const pass = score >= minPassScore && jargonHits.length <= maxJargonHitsBeforeFail;
+  const hardFail =
+    checks.includes("surface_anchor") ||
+    checks.includes("paraphrase_weak") ||
+    checks.includes("thread_repetition") ||
+    checks.includes("jargon_overload");
+  const pass =
+    score >= minPassScore && jargonHits.length <= maxJargonHitsBeforeFail && !hardFail;
 
   return { score, pass, checks };
 }

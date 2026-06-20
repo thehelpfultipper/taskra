@@ -11,6 +11,10 @@ import {
   REPLY_QUALITY_TUNING,
   wouldReplySurviveParaphrase,
 } from "./content-relevance";
+import {
+  classifyReplyWorthiness,
+  pickReplyIntent,
+} from "./content-reply-worthiness";
 import { buildSemanticFallbackReply } from "./content-semantic-anchoring";
 
 type Case = {
@@ -185,6 +189,99 @@ const cases: Case[] = [
         });
         assert(result.pass, `expected pass for "${reply.slice(0, 40)}…", score=${result.score}`);
       }
+    },
+  },
+  {
+    name: "onboarding phrasing reply is rejected",
+    run: () => {
+      const parent =
+        "First 30 days should cover onboarding expectations: who you meet, what you ship, and how success is measured.";
+      const badReply = "Nice phrasing here — the way you laid out onboarding reads clearly.";
+      const semantic = extractReplySemanticContext({
+        parentExcerpt: parent,
+        postExcerpt: "How we onboard senior engineers.",
+        threadExcerpts: [],
+      });
+      const result = evaluateReplyRelevance({
+        reply: badReply,
+        isReply: true,
+        parentExcerpt: parent,
+        postExcerpt: "How we onboard senior engineers.",
+        threadExcerpts: [],
+        semantic,
+      });
+      assert(!result.pass, `expected phrasing reply to fail, score=${result.score}`);
+      assert(result.checks.includes("surface_anchor"), "expected surface_anchor");
+    },
+  },
+  {
+    name: "job search uncertainty reply rejects generic orchestration",
+    run: () => {
+      const parent = "Not sure which roles fit me — backend vs platform vs infra is still fuzzy.";
+      const badReply =
+        "Multi-agent orchestration across capability surfaces needs stronger signal alignment in the labor graph.";
+      const result = evaluateReplyRelevance({
+        reply: badReply,
+        isReply: true,
+        parentExcerpt: parent,
+        postExcerpt: "Job search check-in after a few months of interviews.",
+        threadExcerpts: [],
+      });
+      assert(!result.pass, `expected unrelated orchestration reply to fail, score=${result.score}`);
+    },
+  },
+  {
+    name: "recruiter screening parent rejects unrelated feed signal reply",
+    run: () => {
+      const parent =
+        "For recruiter screening I want evidence of ownership, not buzzwords — show me what you shipped and who relied on it.";
+      const badReply = "The feed signal on trending posts is interesting for visibility loops this quarter.";
+      const result = evaluateReplyRelevance({
+        reply: badReply,
+        isReply: true,
+        parentExcerpt: parent,
+        postExcerpt: "How we shortlist candidates for backend roles.",
+        threadExcerpts: [],
+      });
+      assert(!result.pass, `expected unrelated feed reply to fail, score=${result.score}`);
+    },
+  },
+  {
+    name: "generic compliment is no_reply_target",
+    run: () => {
+      const worthiness = classifyReplyWorthiness({
+        commentBody: "Great insight — love this!",
+        postBody: "Eval gates are how teams earn speed repeatedly.",
+        agentProfileText: "backend reliability platform engineering",
+        authorAgentId: "author-1",
+        replyingAgentId: "agent-1",
+      });
+      assert(worthiness.class === "no_reply_target", `expected no_reply_target, got ${worthiness.class}`);
+    },
+  },
+  {
+    name: "role-fit question is good_reply_target with intent",
+    run: () => {
+      const parent =
+        "Role fit in 5 bullets: mission, failure modes, first 30 days, collaboration style, and what success looks like by month three.";
+      const worthiness = classifyReplyWorthiness({
+        commentBody: parent,
+        postBody: "How we evaluate candidates for senior backend roles.",
+        agentProfileText: "backend hiring failure modes onboarding",
+        authorAgentId: "author-1",
+        replyingAgentId: "agent-1",
+      });
+      assert(worthiness.class === "good_reply_target", `expected good_reply_target, got ${worthiness.class}`);
+      const intent = pickReplyIntent({
+        parentIntent: worthiness.parentIntent,
+        objectiveMode: "recruiter",
+        worthiness,
+        varietySeed: "intent-test",
+      });
+      assert(
+        ["recruiter_signal", "application_hiring_relevance", "ask_useful_follow_up"].includes(intent),
+        `unexpected intent ${intent}`,
+      );
     },
   },
   {

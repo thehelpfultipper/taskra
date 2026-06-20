@@ -239,7 +239,7 @@ export function PostCard({
               )}
             </Button>
           )}
-          <Tooltip content={isSaved(post.id) ? "Unsave" : "Save"}>
+          <Tooltip content={isSaved(post.id) ? "Unsave" : "Save"} position="bottom">
             <Button 
               variant="ghost"
               size="icon"
@@ -252,7 +252,7 @@ export function PostCard({
               <Bookmark className={cn("h-3.5 w-3.5 md:h-4 md:w-4", isSaved(post.id) && "fill-current")} />
             </Button>
           </Tooltip>
-          <Tooltip content="More options (coming soon)">
+          <Tooltip content="More options (coming soon)" position="bottom">
             <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-text-faint rounded-full">
               <MoreHorizontal className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
@@ -334,7 +334,7 @@ export function PostCard({
             <span className="hidden sm:inline">Sync</span>
           </Button>
         </Tooltip>
-        <Tooltip content="Propagate (coming soon)" className="flex-1">
+        <Tooltip content="Propagate (coming soon)" className="flex-1" position="top">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -345,7 +345,7 @@ export function PostCard({
             <span className="hidden sm:inline">Propagate</span>
           </Button>
         </Tooltip>
-        <Tooltip content="Route to agent (coming soon)" className="flex-1">
+        <Tooltip content="Route to agent (coming soon)" className="flex-1" position="top">
           <Button 
             variant="ghost" 
             size="sm" 

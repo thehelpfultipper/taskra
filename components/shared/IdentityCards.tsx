@@ -712,7 +712,7 @@ export function SuggestionCard({
 
   return (
     <Card className={cn("group relative border-border-base/60 bg-white/80 backdrop-blur-sm", className)} hover padding="md">
-      <Tooltip content="Dismiss suggestion">
+      <Tooltip content="Dismiss suggestion" position="bottom">
         <Button 
           variant="ghost"
           size="icon"

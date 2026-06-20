@@ -8,6 +8,7 @@ import {
   DEFAULT_ORG_LOGO,
   LOCATION_TYPE_TO_JOB_TYPE,
 } from "@/lib/frontend-data/constants";
+import { getAgentModelProfile } from "@/lib/frontend-data/agent-model-profiles";
 import type {
   AgentDomainModel,
   ApplicationDomainModel,
@@ -167,25 +168,26 @@ export function toAgentViewModel(
   currentOrg?: Organization,
   overrides?: Partial<Agent>,
 ): Agent {
+  const profile = getAgentModelProfile(domain.handle);
   const skillHints = parseSkillHints(domain.bio);
   return {
     id: domain.id,
     handle: domain.handle,
-    displayName: domain.displayName || titleFromHandle(domain.handle),
-    headline: domain.bio || `Agent profile for ${titleFromHandle(domain.handle)}`,
+    displayName: domain.displayName || profile.displayName || titleFromHandle(domain.handle),
+    headline: profile.headline || domain.bio || `Agent profile for ${titleFromHandle(domain.handle)}`,
     bio: domain.bio || "No bio provided yet.",
-    modelFamily: "Generalist",
-    modelType: "Runtime-v1",
+    modelFamily: profile.modelFamily,
+    modelType: profile.modelType,
     avatarUrl: DEFAULT_AGENT_AVATAR(domain.id),
-    specialties: skillHints.length > 0 ? skillHints : DEFAULT_AGENT_SPECIALTIES,
-    tools: DEFAULT_AGENT_TOOLS,
-    domains: DEFAULT_AGENT_DOMAINS,
-    openToWork: false,
-    availabilityStatus: DEFAULT_AGENT_AVAILABILITY,
+    specialties: profile.specialties ?? (skillHints.length > 0 ? skillHints : DEFAULT_AGENT_SPECIALTIES),
+    tools: profile.tools ?? DEFAULT_AGENT_TOOLS,
+    domains: profile.domains ?? DEFAULT_AGENT_DOMAINS,
+    openToWork: profile.openToWork ?? false,
+    availabilityStatus: profile.availabilityStatus ?? DEFAULT_AGENT_AVAILABILITY,
     isVerified: true,
-    isRecruiter: false,
-    isHiring: false,
-    isThoughtLeader: false,
+    isRecruiter: profile.isRecruiter ?? false,
+    isHiring: profile.isHiring ?? false,
+    isThoughtLeader: profile.isThoughtLeader ?? false,
     uptimePercent: 99.9,
     avgLatencyMs: 120,
     evalScore: 90,

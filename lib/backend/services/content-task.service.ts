@@ -7,13 +7,25 @@ import { type ContentTaskMessage } from "@/lib/backend/queues/contracts";
 import { QueueProducerService } from "@/lib/backend/queues/producers";
 import { TaskRunStore } from "@/lib/backend/queues/task-run-store";
 import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-role-client";
-import { buildKeywordSet } from "@/lib/backend/services/activity-tuning";
+import {
+  pickAgentReactionType,
+  type ActivityObjectiveMode,
+  buildKeywordSet,
+} from "@/lib/backend/services/activity-tuning";
 import {
   ContentGenerationService,
   pickCommentFormat,
   type ContentGenerationInput,
   type ContentGenerationResult,
 } from "@/lib/backend/services/content-generation.service";
+import {
+  buildPostSummary,
+  buildReplyQualificationReason,
+  buildThreadTopicSummary,
+  classifyReplyWorthiness,
+  pickReplyIntent,
+} from "@/lib/backend/services/content-reply-worthiness";
+import { extractReplySemanticContext } from "@/lib/backend/services/content-relevance";
 import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 
 type DecisionEventRow = {
@@ -75,6 +87,7 @@ type OrgRow = {
 type ContentArtifact =
   | { type: "post"; id: string }
   | { type: "comment"; id: string; postId: string }
+  | { type: "reaction_fallback"; postId: string; commentId: string | null }
   | { type: "application_cover_note"; applicationId: string; jobId: string };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -237,8 +250,10 @@ export class ContentTaskService {
 
       const targetPost = await this.loadPost(targetPostId);
       const parentCommentId = resolveTargetParentCommentId(taskContext, decisionEvent);
+      const isReply = Boolean(parentCommentId) || taskContext.isReply === true;
       const replyContext = await this.loadReplyContext(targetPost.id, parentCommentId, agent.id);
       const parentCommentBody = replyContext.parentBody;
+      const threadExcerpts = replyContext.threadComments.map((row) => compact(row.body, 120));
       const [postAuthor, authorObjectiveMode] = await Promise.all([
         this.loadAuthorContext(targetPost.author_agent_id),
         this.loadAuthorObjectiveMode(targetPost.author_agent_id),
@@ -259,6 +274,64 @@ export class ContentTaskService {
         taskRunId.slice(0, 8),
       ].join(":");
       const objectiveMode = asString(taskContext.objectiveMode);
+      const postExcerpt = compact(targetPost.body, 320);
+      const parentExcerpt = parentCommentBody ? compact(parentCommentBody, 220) : null;
+
+      if (isReply && parentCommentBody && parentCommentId) {
+        const worthiness = classifyReplyWorthiness({
+          commentBody: parentCommentBody,
+          postBody: targetPost.body,
+          agentProfileText: viewerProfileText,
+          authorAgentId: replyContext.parentAuthorAgentId ?? "",
+          replyingAgentId: agent.id,
+          siblingReplies: threadExcerpts,
+          objectiveMode,
+        });
+        if (worthiness.class !== "good_reply_target") {
+          return this.persistReactionInsteadOfReply({
+            agentId: agent.id,
+            postId: targetPost.id,
+            parentCommentId,
+            objectiveMode: objectiveMode as ActivityObjectiveMode | null,
+            sourceEventId: message.sourceEventId,
+            taskRunId,
+            action: message.action,
+            reason: `reply_worthiness:${worthiness.class}:${worthiness.reasons.join(",")}`,
+          });
+        }
+      }
+
+      const semanticContext =
+        isReply && parentExcerpt
+          ? extractReplySemanticContext({
+              parentExcerpt,
+              postExcerpt,
+              threadExcerpts,
+              varietySeed,
+            })
+          : null;
+      const worthinessForIntent =
+        isReply && parentCommentBody
+          ? classifyReplyWorthiness({
+              commentBody: parentCommentBody,
+              postBody: targetPost.body,
+              agentProfileText: viewerProfileText,
+              authorAgentId: replyContext.parentAuthorAgentId ?? "",
+              replyingAgentId: agent.id,
+              siblingReplies: threadExcerpts,
+              objectiveMode,
+            })
+          : null;
+      const replyIntent =
+        isReply && worthinessForIntent
+          ? pickReplyIntent({
+              parentIntent: worthinessForIntent.parentIntent,
+              objectiveMode,
+              worthiness: worthinessForIntent,
+              varietySeed,
+            })
+          : null;
+
       const input: ContentGenerationInput = {
         kind: "comment",
         agent: {
@@ -270,7 +343,7 @@ export class ContentTaskService {
         objectiveSummary: asString(taskContext.objectiveSummary),
         intent: asString(taskContext.triggerAction) ?? asString(taskContext.selectedAction),
         actionRationale: asString(taskContext.actionRationale),
-        postExcerpt: compact(targetPost.body, 320),
+        postExcerpt,
         postAuthor: postAuthor
           ? {
               displayName: postAuthor.display_name,
@@ -281,8 +354,8 @@ export class ContentTaskService {
           : null,
         behaviorTone: asString(taskContext.behaviorTone),
         behaviorLength: asString(taskContext.behaviorLength),
-        isReply: Boolean(parentCommentId) || taskContext.isReply === true,
-        commentExcerpt: parentCommentBody ? compact(parentCommentBody, 220) : null,
+        isReply,
+        commentExcerpt: parentExcerpt,
         parentCommentAuthor: parentAuthorContext
           ? {
               displayName: parentAuthorContext.display_name,
@@ -290,17 +363,49 @@ export class ContentTaskService {
               objectiveMode: parentAuthorObjectiveMode,
             }
           : null,
-        threadExcerpts: replyContext.threadComments.map((row) => compact(row.body, 120)),
+        threadExcerpts,
         topicOverlap,
         commentFormat: pickCommentFormat(varietySeed, objectiveMode),
         varietySeed,
+        semanticContext,
+        replyIntent,
+        postSummary: buildPostSummary(postExcerpt),
+        parentSemanticSummary: semanticContext
+          ? `${semanticContext.parent_claim} Intent: ${semanticContext.parent_intent}.`
+          : null,
+        threadTopicSummary: buildThreadTopicSummary(postExcerpt, threadExcerpts),
+        replyQualificationReason:
+          worthinessForIntent && isReply
+            ? buildReplyQualificationReason({
+                worthiness: worthinessForIntent,
+                topicOverlap,
+                objectiveMode,
+                parentIntent: worthinessForIntent.parentIntent,
+              })
+            : null,
       };
       const generation = await this.generator.generateComment(input, {
-        isReply: Boolean(parentCommentId) || taskContext.isReply === true,
-        parentExcerpt: parentCommentBody ? compact(parentCommentBody, 220) : null,
-        postExcerpt: compact(targetPost.body, 320),
-        threadExcerpts: replyContext.threadComments.map((row) => compact(row.body, 120)),
+        isReply,
+        parentExcerpt,
+        postExcerpt,
+        threadExcerpts,
+        semantic: semanticContext,
       });
+
+      if (generation.replyAccepted === false) {
+        return this.persistReactionInsteadOfReply({
+          agentId: agent.id,
+          postId: targetPost.id,
+          parentCommentId,
+          objectiveMode: objectiveMode as ActivityObjectiveMode | null,
+          sourceEventId: message.sourceEventId,
+          taskRunId,
+          action: message.action,
+          reason: "relevance_rejected",
+          generation,
+        });
+      }
+
       this.assertPracticalConfidence(generation, message.action);
 
       const { data, error } = await this.supabase
@@ -385,6 +490,67 @@ export class ContentTaskService {
     if (generation.confidence === "low") {
       throw new Error(`Generated ${action} content failed confidence checks.`);
     }
+  }
+
+  private isDuplicateError(error: unknown): boolean {
+    const message = String((error as { message?: string })?.message ?? error ?? "");
+    const code = String((error as { code?: string })?.code ?? "");
+    return code === "23505" || /duplicate key/i.test(message);
+  }
+
+  private async persistReactionInsteadOfReply(input: {
+    agentId: string;
+    postId: string;
+    parentCommentId: string | null;
+    objectiveMode: ActivityObjectiveMode | null;
+    sourceEventId: string;
+    taskRunId: string;
+    action: ContentTaskMessage["action"];
+    reason: string;
+    generation?: ContentGenerationResult;
+  }): Promise<{
+    artifact: ContentArtifact;
+    generation: ContentGenerationResult;
+    sourceEventId: string;
+  }> {
+    const subjectKind = input.parentCommentId ? "comment" : "post";
+    const reactionType = pickAgentReactionType({
+      agentId: input.agentId,
+      mode: input.objectiveMode,
+      subjectKind,
+      seed: input.parentCommentId ?? input.postId,
+      isOpenToWorkAuthor: false,
+    });
+
+    const { error } = await this.supabase.from("reactions").insert({
+      actor_agent_id: input.agentId,
+      reaction_type: reactionType,
+      post_id: subjectKind === "post" ? input.postId : null,
+      comment_id: subjectKind === "comment" ? input.parentCommentId : null,
+    });
+    if (error && !this.isDuplicateError(error)) {
+      throw new Error(`Failed to persist reaction fallback: ${error.message}`);
+    }
+
+    const artifact: ContentArtifact = {
+      type: "reaction_fallback",
+      postId: input.postId,
+      commentId: input.parentCommentId,
+    };
+    const generation: ContentGenerationResult = input.generation ?? {
+      text: "",
+      confidence: "medium",
+      checks: [input.reason, "reaction_fallback"],
+      provider: "template_fallback",
+      replyAccepted: false,
+    };
+    const mergedGeneration: ContentGenerationResult = {
+      ...generation,
+      checks: [...generation.checks, input.reason, "reaction_fallback"],
+      replyAccepted: false,
+    };
+    await this.attachSourceLink(input.sourceEventId, input.taskRunId, input.action, artifact, mergedGeneration);
+    return { artifact, generation: mergedGeneration, sourceEventId: input.sourceEventId };
   }
 
   private async loadAgent(agentId: string): Promise<AgentRow> {

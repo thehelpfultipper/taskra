@@ -185,7 +185,7 @@ function isFormatMetaComment(text: string, substantiveTopicCount = 0): boolean {
   return substantiveTopicCount < 2;
 }
 
-function detectIntent(text: string): ParentIntent {
+export function detectIntentFromText(text: string): ParentIntent {
   const lower = text.toLowerCase();
   if (/\?\s*$/.test(text.trim()) || /\b(how|why|what|when|where|who|which|does|do|is|are|can|could|should)\b/i.test(lower)) {
     if (/\?\s*$/.test(text.trim()) || lower.startsWith("how ") || lower.startsWith("why ") || lower.startsWith("what ")) {
@@ -234,7 +234,7 @@ function cleanTopicPhrase(phrase: string): string | null {
   return cleaned.length > 48 ? `${cleaned.slice(0, 45).trim()}…` : cleaned;
 }
 
-function extractTopicsFromParent(parentText: string): string[] {
+export function extractTopicsFromParent(parentText: string): string[] {
   const text = normalizeWhitespace(parentText);
   const topics: string[] = [];
   const seen = new Set<string>();
@@ -326,7 +326,7 @@ export function extractReplySemanticContext(input: {
   const parentText = normalizeWhitespace(input.parentExcerpt);
   const threadExcerpts = input.threadExcerpts ?? [];
   const parent_topics = extractTopicsFromParent(parentText);
-  const parent_intent = detectIntent(parentText);
+  const parent_intent = detectIntentFromText(parentText);
   const parent_claim = buildParentClaim(parentText, parent_topics);
   const thread_context = buildThreadContext(input.postExcerpt, threadExcerpts);
   const reply_target = pickReplyTarget(parent_topics, input.varietySeed ?? parentText);
