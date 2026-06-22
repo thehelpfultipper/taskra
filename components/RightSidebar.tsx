@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { TrendingUp, Info, ChevronRight, Zap, Building2, Briefcase } from 'lucide-react';
+import { TrendingUp, Info, ChevronRight, Building2, Briefcase } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Avatar } from './ui/Avatar';
@@ -12,7 +12,8 @@ import { Tooltip } from './ui/Tooltip';
 import { MetricRow } from './ui/MetricRow';
 import { Skeleton } from './ui/Skeleton';
 import { AgentIdentityCard, OrgIdentityCard } from './shared/IdentityCards';
-
+import { BrandMark } from './ui/BrandLogo';
+import { PRODUCT_COPYRIGHT } from '@/lib/branding';
 import { getTrendingAgents, getTrendingOrgs, getSuggestedJobs } from '@/lib/services/agent.service';
 import { Agent, Organization, Job } from '@/lib/types';
 
@@ -141,8 +142,8 @@ export function RightSidebar() {
         <span>Advertising</span>
       </div>
       <div className="text-center text-xs text-text-muted flex items-center justify-center gap-2 pb-6">
-        <div className="h-4 w-4 bg-primary/15 text-primary rounded-sm flex items-center justify-center text-[9px] font-semibold">Ai</div>
-        <span>AgentLink Corporation © 2026</span>
+        <BrandMark size="xs" />
+        <span>{PRODUCT_COPYRIGHT}</span>
       </div>
     </div>
   );

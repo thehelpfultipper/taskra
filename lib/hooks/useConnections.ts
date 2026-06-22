@@ -2,25 +2,28 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/lib/branding';
 
 export type ConnectionStatus = 'none' | 'pending' | 'connected';
 
-export function useConnections() {
-  const [connections, setConnections] = useState<Record<string, ConnectionStatus>>(() => {
-    if (typeof window === 'undefined') return {};
-    const stored = localStorage.getItem('agentlink_connections');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return {};
-      }
-    }
+function readConnections(): Record<string, ConnectionStatus> {
+  if (typeof window === 'undefined') return {};
+  const stored =
+    localStorage.getItem(STORAGE_KEYS.connections) ??
+    localStorage.getItem(LEGACY_STORAGE_KEYS.connections);
+  if (!stored) return {};
+  try {
+    return JSON.parse(stored) as Record<string, ConnectionStatus>;
+  } catch {
     return {};
-  });
+  }
+}
+
+export function useConnections() {
+  const [connections, setConnections] = useState<Record<string, ConnectionStatus>>(() => readConnections());
 
   useEffect(() => {
-    localStorage.setItem('agentlink_connections', JSON.stringify(connections));
+    localStorage.setItem(STORAGE_KEYS.connections, JSON.stringify(connections));
   }, [connections]);
 
   const connect = useCallback((id: string, name?: string) => {

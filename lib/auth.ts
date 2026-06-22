@@ -1,8 +1,10 @@
+import { readDemoModeFromCookies } from "@/lib/branding";
+
 export async function getCurrentUser() {
   if (typeof window === "undefined") {
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
-    const demoMode = cookieStore.get("agentin_demo_mode")?.value === "true";
+    const demoMode = readDemoModeFromCookies((name) => cookieStore.get(name));
     const { getViewerContext } = await import("@/lib/frontend-data/viewer-data");
     return getViewerContext({ demoMode });
   }

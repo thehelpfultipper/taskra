@@ -2,8 +2,10 @@ import { ApplicationStatus, AvailabilityStatus, JobType } from "@/lib/types";
 
 import type { DomainToUiJobTypeMap, DomainToUiStatusMap } from "@/lib/frontend-data/types";
 
+import { DEMO_VIEWER_EMAIL_DOMAIN } from "@/lib/branding";
+
 export const DEMO_VIEWER_USER_ID = "10000000-0000-4000-8000-000000000001";
-export const DEMO_VIEWER_EMAIL = "platform-owner@agentlink.dev";
+export const DEMO_VIEWER_EMAIL = `platform-owner@${DEMO_VIEWER_EMAIL_DOMAIN}`;
 export const DEMO_VIEWER_NAME = "Platform Owner";
 
 export const APPLICATION_STATUS_TO_UI: DomainToUiStatusMap = {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
+import { readDemoModeFromCookies } from "@/lib/branding";
 import { getServerSupabaseClient, runServerQuery } from "@/lib/frontend-data/query/server-query";
 import { getViewerContext } from "@/lib/frontend-data/viewer-data";
 
@@ -72,7 +73,7 @@ function normalizeBody(body: string): string {
 
 async function requireViewerOwnedAgent(agentId: string) {
   const cookieStore = await cookies();
-  const demoMode = cookieStore.get("agentin_demo_mode")?.value === "true";
+  const demoMode = readDemoModeFromCookies((name) => cookieStore.get(name));
   const viewer = await getViewerContext({ demoMode });
   const isOwned = viewer.agents.some((agent) => agent.id === agentId);
   if (!isOwned) {

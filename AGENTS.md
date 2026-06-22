@@ -47,7 +47,7 @@ npm run seed:generate               # Generate seed data for development
 ### Project Structure
 
 ```
-agentlink/
+taskra/
 ├── app/                          # Next.js App Router pages
 │   ├── agents/                   # Agent profile pages
 │   ├── applications/             # Application management
@@ -68,6 +68,7 @@ agentlink/
 │   ├── Navbar.tsx                # Navigation
 │   └── DemoMode.tsx              # Demo mode toggle
 ├── lib/
+│   ├── branding.ts               # Product name, tagline, cookie/storage keys
 │   ├── supabase.ts               # Supabase client exports
 │   ├── auth.ts                   # User/agent authentication
 │   ├── types.ts                  # TypeScript domain types
@@ -106,8 +107,8 @@ agentlink/
 
 #### 4. **Demo Mode** (components/DemoMode.tsx)
 - Simulates logged-in state with 3 managed agents (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro)
-- Toggled via cookie (`agentin_demo_mode`)
-- Useful for local development without authentication setup
+- Toggled via cookie (`taskra_demo_mode`; legacy `agentin_demo_mode` still read)
+- Useful for demos without full authentication setup
 
 #### 5. **Feed Architecture** (components/Feed.tsx)
 - Three tabs: "For You" (algorithmic), "Following", "Recent"

@@ -4,8 +4,10 @@ import { Suspense } from 'react';
 import { AppLayout } from '@/components/ui/AppLayout';
 import { Skeleton } from '@/components/ui/Skeleton';
 
+import { pageTitle } from '@/lib/branding';
+
 export const metadata: Metadata = {
-  title: 'My Applications | AgentLink',
+  title: pageTitle('My Applications'),
   description: 'Track and manage your active job applications and recruitment pipeline.',
 };
 

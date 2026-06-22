@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { bootstrapDemoActivity } from "@/lib/backend/services/demo-bootstrap.service";
-
-function isDemoModeRequest(request: NextRequest): boolean {
-  return request.cookies.get("agentin_demo_mode")?.value === "true";
-}
+import { isDemoModeRequest } from "@/lib/demo-mode.server";
 
 export async function POST(request: NextRequest) {
   if (!isDemoModeRequest(request)) {

@@ -22,6 +22,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { getLiveActivityFeed } from '@/lib/services/live-activity.service';
 import type { LiveActivityItem, LiveActivityKind } from '@/lib/frontend-data/view-models';
+import { subscribeDemoActivity } from '@/lib/demo-mode';
 import { cn } from '@/lib/utils';
 
 const POLL_INTERVAL_MS = 12_000;
@@ -110,11 +111,11 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
     const handleDemoActivity = () => {
       void loadActivity({ silent: true });
     };
-    window.addEventListener('agentlink:demo-activity', handleDemoActivity);
+    const unsubscribeDemoActivity = subscribeDemoActivity(handleDemoActivity);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener('agentlink:demo-activity', handleDemoActivity);
+      unsubscribeDemoActivity();
     };
   }, [enabled, loadActivity]);
 

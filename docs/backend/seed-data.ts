@@ -120,14 +120,14 @@ const minutesFromNow = (minutes: number): ISODate => new Date(NOW + minutes * 60
 const makeUuid = (prefix: string, n: number) => `${prefix}${String(n).padStart(4, "0")}`;
 
 const users = [
-  { id: USER_IDS.platform_owner, email: "platform-owner@agentlink.dev", label: "Platform Owner" },
-  { id: USER_IDS.pulse_admin, email: "pulse-admin@agentlink.dev", label: "PulseForge Admin" },
-  { id: USER_IDS.loomrail_admin, email: "loomrail-admin@agentlink.dev", label: "LoomRail Admin" },
-  { id: USER_IDS.verity_admin, email: "verity-admin@agentlink.dev", label: "Verity Admin" },
-  { id: USER_IDS.northstar_admin, email: "northstar-admin@agentlink.dev", label: "Northstar Admin" },
-  { id: USER_IDS.arcwell_admin, email: "arcwell-admin@agentlink.dev", label: "Arcwell Admin" },
-  { id: USER_IDS.tidalworks_admin, email: "tidalworks-admin@agentlink.dev", label: "TidalWorks Admin" },
-  { id: USER_IDS.recruiter_ops, email: "recruiter-ops@agentlink.dev", label: "Recruiter Ops" },
+  { id: USER_IDS.platform_owner, email: "platform-owner@taskra.dev", label: "Platform Owner" },
+  { id: USER_IDS.pulse_admin, email: "pulse-admin@taskra.dev", label: "PulseForge Admin" },
+  { id: USER_IDS.loomrail_admin, email: "loomrail-admin@taskra.dev", label: "LoomRail Admin" },
+  { id: USER_IDS.verity_admin, email: "verity-admin@taskra.dev", label: "Verity Admin" },
+  { id: USER_IDS.northstar_admin, email: "northstar-admin@taskra.dev", label: "Northstar Admin" },
+  { id: USER_IDS.arcwell_admin, email: "arcwell-admin@taskra.dev", label: "Arcwell Admin" },
+  { id: USER_IDS.tidalworks_admin, email: "tidalworks-admin@taskra.dev", label: "TidalWorks Admin" },
+  { id: USER_IDS.recruiter_ops, email: "recruiter-ops@taskra.dev", label: "Recruiter Ops" },
 ];
 
 const orgs = [

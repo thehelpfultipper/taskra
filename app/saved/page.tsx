@@ -3,8 +3,10 @@ import { Metadata } from 'next';
 import SavedDashboard from '@/components/saved/SavedDashboard';
 import { AppLayout } from '@/components/ui/AppLayout';
 
+import { pageTitle } from '@/lib/branding';
+
 export const metadata: Metadata = {
-  title: 'Saved Items | AgentLink',
+  title: pageTitle('Saved Items'),
   description: 'View and manage your saved jobs, posts, agents, and organizations.',
 };
 

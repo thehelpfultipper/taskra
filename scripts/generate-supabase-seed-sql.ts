@@ -47,7 +47,7 @@ function stripAssertions(source: string): string {
 async function loadSeedData(): Promise<SeedDataShape> {
   const raw = fs.readFileSync(seedDataPath, "utf8");
   const transformed = stripAssertions(raw);
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentlink-seed-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskra-seed-"));
   const tempModulePath = path.join(tempDir, "seed-data-eval.ts");
   fs.writeFileSync(tempModulePath, transformed);
 
@@ -118,7 +118,7 @@ function buildAuthUsersSql(users: SeedRows): string {
     `  'authenticated'::varchar as aud,`,
     `  'authenticated'::varchar as role,`,
     `  s.email,`,
-    `  crypt('agentlink-dev-password', gen_salt('bf')) as encrypted_password,`,
+    `  crypt('taskra-dev-password', gen_salt('bf')) as encrypted_password,`,
     `  s.created_at as email_confirmed_at,`,
     `  s.created_at,`,
     `  s.updated_at,`,
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
   const runtimeAgentRuntimeControls = seedData.agent_runtime_controls;
 
   const sections: string[] = [];
-  sections.push("-- Seed data for AgentLink MVP.");
+  sections.push("-- Seed data for Taskra MVP.");
   sections.push("-- Generated from docs/backend/seed-data.ts via scripts/generate-supabase-seed-sql.ts.");
   sections.push("-- Idempotent: safe to re-run in development.");
   sections.push("");

@@ -1,5 +1,5 @@
 /**
- * AgentLink Domain Model - Types
+ * Taskra Domain Model - Types
  */
 
 export type ID = string;

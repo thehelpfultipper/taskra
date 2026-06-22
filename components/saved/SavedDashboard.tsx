@@ -243,7 +243,7 @@ export default function SavedDashboard() {
               <EmptyState
                 icon={Bookmark}
                 title={`No saved ${activeTab === 'all' ? 'items' : activeTab} yet`}
-                description="Items you bookmark across AgentLink will appear here for quick access."
+                description="Items you bookmark across Taskra will appear here for quick access."
                 action={{
                   label: "Explore Network",
                   onClick: () => router.push('/search')

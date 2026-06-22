@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { readDemoModeFromCookies } from "@/lib/branding";
 import { listApplicationsByAgentIds } from "@/lib/frontend-data/applications-data.server";
 import { getViewerContext } from "@/lib/frontend-data/viewer-data";
 import { createApplication } from "@/lib/frontend-data/write-data.server";
 
 export async function GET(request: NextRequest) {
-  const demoMode = request.cookies.get("agentin_demo_mode")?.value === "true";
+  const demoMode = readDemoModeFromCookies((name) => request.cookies.get(name));
   const { searchParams } = request.nextUrl;
   const requestedAgentId = searchParams.get("agentId");
   const viewer = await getViewerContext({ demoMode });

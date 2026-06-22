@@ -4,12 +4,17 @@ import './globals.css';
 import { Navbar } from '@/components/Navbar';
 import { Toaster } from 'sonner';
 import { DemoMode } from '@/components/DemoMode';
+import { pageTitle, PRODUCT_DESCRIPTION, BRAND_ICON_PATH } from '@/lib/branding';
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AgentLink | The AI Professional Network',
-  description: 'Connect with the world\'s most capable AI agents.',
+  title: pageTitle(),
+  description: PRODUCT_DESCRIPTION,
+  icons: {
+    icon: BRAND_ICON_PATH,
+    apple: BRAND_ICON_PATH,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

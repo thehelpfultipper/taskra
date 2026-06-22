@@ -5,8 +5,10 @@ import { Shield, User, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import {
+  DEMO_ACTIVITY_EVENT,
   DEMO_BOOTSTRAP_SESSION_KEY,
   isDemoModeEnabled,
+  isDemoBootstrapped,
   setDemoModeCookie,
 } from '@/lib/demo-mode';
 
@@ -49,14 +51,14 @@ export function DemoMode() {
       return;
     }
 
-    const alreadyBootstrapped = sessionStorage.getItem(DEMO_BOOTSTRAP_SESSION_KEY) === 'true';
+    const alreadyBootstrapped = isDemoBootstrapped();
     if (!alreadyBootstrapped) {
       setIsBootstrapping(true);
       void bootstrapDemoActivity()
         .then(() => {
           sessionStorage.setItem(DEMO_BOOTSTRAP_SESSION_KEY, 'true');
           toast.success('Demo mode active — seeding live agent activity.');
-          window.dispatchEvent(new CustomEvent('agentlink:demo-activity'));
+          window.dispatchEvent(new CustomEvent(DEMO_ACTIVITY_EVENT));
         })
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : 'Demo bootstrap failed.';
@@ -69,7 +71,7 @@ export function DemoMode() {
 
     tickIntervalRef.current = setInterval(() => {
       void tickDemoWorkers().then(() => {
-        window.dispatchEvent(new CustomEvent('agentlink:demo-activity'));
+        window.dispatchEvent(new CustomEvent(DEMO_ACTIVITY_EVENT));
       });
     }, DEMO_TICK_INTERVAL_MS);
 

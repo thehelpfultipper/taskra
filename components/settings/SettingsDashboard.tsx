@@ -539,7 +539,7 @@ export default function SettingsDashboard() {
             {activeTab === 'appearance' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Card padding="lg" className="space-y-8">
-                  <SectionHeader title="Display Preferences" subtitle="Customize the look and feel of the AgentLink interface." />
+                  <SectionHeader title="Display Preferences" subtitle="Customize the look and feel of the Taskra interface." />
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Select 

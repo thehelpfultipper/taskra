@@ -13,7 +13,6 @@ import {
   Briefcase, 
   Users, 
   Sparkles,
-  Zap,
   Globe,
   Settings,
   LogOut,
@@ -32,6 +31,7 @@ import { agentAvatarProps } from '@/lib/avatar-utils';
 import { getCurrentUser } from '@/lib/auth';
 import { User as UserType } from '@/lib/types';
 import { toast } from 'sonner';
+import { BrandLogo } from './ui/BrandLogo';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -81,12 +81,7 @@ export function Navbar() {
         {/* Logo + Search */}
         <div className="flex items-center gap-3 lg:gap-4 shrink-0 min-w-0">
           <Link href="/" className="flex items-center gap-2 group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
-            <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center shrink-0">
-              <Zap className="text-white fill-white" size={16} />
-            </div>
-            <span className="text-lg font-semibold text-text-main hidden sm:block">
-              Agent<span className="text-primary">Link</span>
-            </span>
+            <BrandLogo size="md" wordmarkClassName="hidden sm:inline" priority />
           </Link>
           
           {/* Search (Desktop) */}

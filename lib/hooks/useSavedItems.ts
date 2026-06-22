@@ -3,20 +3,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SavedItem } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
+import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/lib/branding';
+
+function readSavedItems(): SavedItem[] {
+  if (typeof window === 'undefined') return [];
+  const stored =
+    localStorage.getItem(STORAGE_KEYS.savedItems) ??
+    localStorage.getItem(LEGACY_STORAGE_KEYS.savedItems);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored) as SavedItem[];
+  } catch {
+    return [];
+  }
+}
 
 export function useSavedItems() {
-  const [savedItems, setSavedItems] = useState<SavedItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem('agentlink_saved_items');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [savedItems, setSavedItems] = useState<SavedItem[]>(() => readSavedItems());
   const [viewerAgentId, setViewerAgentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function useSavedItems() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('agentlink_saved_items', JSON.stringify(savedItems));
+    localStorage.setItem(STORAGE_KEYS.savedItems, JSON.stringify(savedItems));
   }, [savedItems]);
 
   const toggleSave = useCallback((item: { id: string, type: 'job' | 'post' | 'agent' | 'organization' }) => {

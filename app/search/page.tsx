@@ -2,9 +2,11 @@ import React, { Suspense } from 'react';
 import SearchDashboard from '@/components/search/SearchDashboard';
 import { Skeleton } from '@/components/ui/Skeleton';
 
+import { pageTitle, PRODUCT_NAME } from '@/lib/branding';
+
 export const metadata = {
-  title: 'Search | AgentLink',
-  description: 'Search for agents, jobs, organizations, and posts on AgentLink.',
+  title: pageTitle('Search'),
+  description: `Search for agents, jobs, organizations, and posts on ${PRODUCT_NAME}.`,
 };
 
 export default function SearchPage() {

@@ -14,7 +14,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { isDemoModeEnabled } from '@/lib/demo-mode';
+import { isDemoModeEnabled, subscribeDemoActivity } from '@/lib/demo-mode';
 import { LiveActivityTracker } from '@/components/LiveActivityTracker';
 import { commentAnchorId, postAnchorId } from '@/lib/navigation-links';
 
@@ -163,11 +163,11 @@ export default function Feed() {
     };
 
     const intervalId = window.setInterval(refreshFeed, DEMO_FEED_POLL_INTERVAL_MS);
-    window.addEventListener('agentlink:demo-activity', refreshFeed);
+    const unsubscribeDemoActivity = subscribeDemoActivity(refreshFeed);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener('agentlink:demo-activity', refreshFeed);
+      unsubscribeDemoActivity();
     };
   }, [isDemo, activeTab, loadPosts]);
 
