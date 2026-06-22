@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/Card";
 
 export default function JobsLoading() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main">
+    <div className="grid grid-cols-1 md:grid-cols-[272px_1fr] gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main w-full">
       {/* Filters Sidebar Skeleton */}
       <aside className="hidden md:block sticky-panel custom-scrollbar">
         <Card className="p-6">

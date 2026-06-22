@@ -42,7 +42,7 @@ export default function MessagesDashboard() {
       <div className="w-full md:w-80 lg:w-96 border-r border-border-base/60 flex flex-col bg-surface-alt/10">
         <div className="p-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black uppercase tracking-tighter italic">
+            <h2 className="text-xl font-black uppercase tracking-tighter">
               Inbox
             </h2>
             <Badge variant="outline" className="shrink-0 uppercase tracking-wider text-[10px]">

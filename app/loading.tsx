@@ -5,7 +5,7 @@ import { CenterScrollRegion } from "@/components/ui/CenterScrollRegion";
 export default function Loading() {
   return (
     <main className="min-h-screen bg-background">
-      <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_300px] gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main">
+      <div className="grid grid-cols-1 md:grid-cols-[272px_1fr] lg:grid-cols-[272px_1fr_320px] gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main w-full">
         {/* Left Sidebar Skeleton */}
         <aside className="hidden md:block sticky-panel custom-scrollbar">
           <div className="space-y-4 pb-6">

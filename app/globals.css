@@ -85,7 +85,7 @@
   }
 
   .container-main {
-    @apply max-w-[1128px] mx-auto px-4 w-full;
+    @apply max-w-[1320px] mx-auto px-4 lg:px-6 w-full;
   }
 
   .accent-gradient {

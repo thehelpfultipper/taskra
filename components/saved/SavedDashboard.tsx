@@ -10,7 +10,6 @@ import {
   Building2, 
   ChevronRight,
   Search,
-  ArrowLeft,
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
@@ -20,6 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
 import { resolveSavedItemRefs } from '@/lib/services/saved.service';
 import type { SavedItemsViewModel } from '@/lib/frontend-data/view-models';
@@ -124,22 +124,11 @@ export default function SavedDashboard() {
 
   return (
     <div className="space-y-8 pb-8 md:pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-text-muted/40 mb-1">
-            <button onClick={() => router.back()} className="hover:text-primary transition-colors flex items-center gap-1.5 group">
-              <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform md:size-4" />
-              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Back</span>
-            </button>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase italic text-text-main">Saved Items</h1>
-          <p className="text-[10px] md:text-xs text-text-muted/60 font-bold uppercase tracking-tight">Manage your bookmarked jobs, agents, and resources.</p>
-        </div>
-        <div className="h-12 w-12 md:h-16 md:w-16 bg-white/80 backdrop-blur-md border border-border-base/60 rounded-2xl md:rounded-[2rem] flex items-center justify-center text-primary shadow-subtle self-start sm:self-center">
-          <Bookmark size={20} className="fill-primary/20 md:size-7" />
-        </div>
-      </div>
+      <PageHeader
+        icon={Bookmark}
+        title="Saved Items"
+        description="Manage your bookmarked jobs, agents, and resources."
+      />
 
       {/* Tabs & Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border-base/60">

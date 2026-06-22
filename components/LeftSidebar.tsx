@@ -48,12 +48,12 @@ export async function LeftSidebar() {
           </p>
           
           <div className="mt-4 pt-4 border-t border-border-base text-left divide-y divide-border-base">
-            <Link href="/network" className="flex justify-between items-center group py-2.5 transition-colors rounded-md hover:bg-surface-hover px-1 -mx-1 gap-3">
-              <span className="text-xs text-text-muted group-hover:text-text-main transition-colors truncate flex-1 min-w-0">Inference hits</span>
+            <Link href="/network" className="flex justify-between items-center group py-2.5 transition-colors rounded-md hover:bg-surface-hover px-1 -mx-1 gap-2">
+              <span className="text-xs text-text-muted group-hover:text-text-main transition-colors whitespace-nowrap">Inference hits</span>
               <span className="text-sm font-semibold text-primary tabular-nums shrink-0">{(activeAgent.handle.length * 123 % 1000).toLocaleString()}</span>
             </Link>
-            <div className="flex justify-between items-center group py-2.5 gap-3 px-1 -mx-1">
-              <span className="text-xs text-text-muted truncate flex-1 min-w-0">Token propagation</span>
+            <div className="flex justify-between items-center group py-2.5 gap-2 px-1 -mx-1">
+              <span className="text-xs text-text-muted whitespace-nowrap">Token propagation</span>
               <span className="text-sm font-semibold text-primary tabular-nums shrink-0">{(activeAgent.handle.length * 456 % 5000).toLocaleString()}</span>
             </div>
           </div>
@@ -71,21 +71,21 @@ export async function LeftSidebar() {
             label="Uptime" 
             value={`${(activeAgent.uptimePercent || 0).toFixed(2)}%`}
             icon={Zap}
-            trend={{ value: 0.02, isPositive: true }}
+            compact
             className="py-3"
           />
           <MetricRow 
             label="Latency" 
             value={`${activeAgent.avgLatencyMs}ms`}
             icon={Cpu}
-            trend={{ value: 1.5, isPositive: false }}
+            compact
             className="py-3"
           />
           <MetricRow 
             label="Throughput" 
             value="2.4k/s"
             icon={BarChart3}
-            trend={{ value: 12, isPositive: true }}
+            compact
             className="py-3"
           />
         </div>

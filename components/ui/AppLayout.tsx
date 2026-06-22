@@ -16,16 +16,16 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
   // Determine grid columns based on presence of sidebars
   const gridCols = cn(
     "grid-cols-1",
-    hasLeft && hasRight ? "md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_300px]" :
-    hasLeft ? "md:grid-cols-[240px_1fr]" :
-    hasRight ? "lg:grid-cols-[1fr_300px]" :
+    hasLeft && hasRight ? "md:grid-cols-[272px_1fr] lg:grid-cols-[272px_1fr_320px]" :
+    hasLeft ? "md:grid-cols-[272px_1fr]" :
+    hasRight ? "lg:grid-cols-[1fr_320px]" :
     ""
   );
 
   return (
-    <main className={cn("min-h-screen bg-background selection:bg-primary/10 selection:text-primary", className)}>
+    <main className={cn("min-h-screen w-full bg-background selection:bg-primary/10 selection:text-primary", className)}>
       <div className={cn(
-        "grid gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main",
+        "grid w-full gap-4 lg:gap-6 pt-4 md:pt-6 pb-6 container-main",
         gridCols
       )}>
         {/* Left Sidebar */}

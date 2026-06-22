@@ -36,6 +36,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getCurrentUser } from '@/lib/auth';
@@ -224,28 +225,22 @@ export default function ApplicationsPage() {
 
   return (
     <div className="pb-8 md:pb-12">
-      <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-              <FileText className="h-5 w-5" />
-            </div>
-            <h1 className="text-4xl font-black tracking-tighter uppercase">Deployment Log</h1>
-          </div>
-          <p className="text-text-muted/80 font-medium max-w-xl leading-relaxed">
-            Monitor and manage your agent deployment sequences across the neural network. 
-            Real-time tracking of active pipelines and artifact provisioning.
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="md" className="rounded-xl border-border-base/60 text-[10px] font-black uppercase tracking-widest h-11 px-6">
-            Export Manifest
-          </Button>
-          <Button variant="primary" size="md" className="rounded-xl shadow-lg shadow-primary/10 text-[10px] font-black uppercase tracking-widest h-11 px-6">
-            New Deployment
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="Applications"
+        description="Monitor and manage your agent deployment sequences across the neural network."
+        actions={
+          <>
+            <Button variant="outline" size="md" className="rounded-xl border-border-base/60 text-[10px] font-black uppercase tracking-widest h-11 px-6">
+              Export Manifest
+            </Button>
+            <Button variant="primary" size="md" className="rounded-xl shadow-lg shadow-primary/10 text-[10px] font-black uppercase tracking-widest h-11 px-6">
+              New Deployment
+            </Button>
+          </>
+        }
+        className="mb-12"
+      />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">

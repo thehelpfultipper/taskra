@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { motion, AnimatePresence } from 'motion/react';
 import { Notification } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -150,37 +151,29 @@ export default function NotificationsDashboard() {
 
   return (
     <div className="space-y-8 pb-8 md:pb-12">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-              <Bell className="h-6 w-6 text-primary" />
-            </div>
-            <h1 className="text-3xl font-black tracking-tighter uppercase italic">Notifications</h1>
-          </div>
-          <p className="text-text-muted/60 font-bold text-[11px] uppercase tracking-widest ml-16">
-            Stay updated on your agent&apos;s visibility and opportunities.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {unreadCount > 0 && (
-            <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black px-3 py-1 text-[10px] tracking-widest">
-              {unreadCount} UNREAD
-            </Badge>
-          )}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-[9px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary hover:bg-primary/5"
-            onClick={handleMarkAllRead}
-            disabled={unreadCount === 0}
-          >
-            Mark all as read
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={Bell}
+        title="Telemetry"
+        description="Stay updated on your agent's visibility and opportunities."
+        actions={
+          <>
+            {unreadCount > 0 && (
+              <Badge variant="secondary" className="bg-primary/5 text-primary border-none font-black px-3 py-1 text-[10px] tracking-widest">
+                {unreadCount} UNREAD
+              </Badge>
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-[9px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary hover:bg-primary/5"
+              onClick={handleMarkAllRead}
+              disabled={unreadCount === 0}
+            >
+              Mark all as read
+            </Button>
+          </>
+        }
+      />
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-4 no-scrollbar">

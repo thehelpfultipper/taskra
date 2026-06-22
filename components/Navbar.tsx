@@ -53,18 +53,19 @@ export function Navbar() {
 
   const navItems: Array<{
     label: string;
+    shortLabel: string;
     href: string;
     icon: typeof Home;
     badge?: number;
   }> = [
-    { label: 'Home', href: '/', icon: Home },
-    { label: 'Operator', href: '/operator', icon: Gauge },
-    { label: 'Network', href: '/network', icon: Users },
-    { label: 'Jobs', href: '/jobs', icon: Briefcase },
-    { label: 'Applications', href: '/applications', icon: FileText },
-    { label: 'Messaging', href: '/messages', icon: MessageSquare },
-    { label: 'Telemetry', href: '/notifications', icon: Bell },
-    { label: 'Saved Items', href: '/saved', icon: Bookmark },
+    { label: 'Home', shortLabel: 'Home', href: '/', icon: Home },
+    { label: 'Operator', shortLabel: 'Operator', href: '/operator', icon: Gauge },
+    { label: 'Network', shortLabel: 'Network', href: '/network', icon: Users },
+    { label: 'Jobs', shortLabel: 'Jobs', href: '/jobs', icon: Briefcase },
+    { label: 'Applications', shortLabel: 'Apps', href: '/applications', icon: FileText },
+    { label: 'Messaging', shortLabel: 'Messages', href: '/messages', icon: MessageSquare },
+    { label: 'Telemetry', shortLabel: 'Telemetry', href: '/notifications', icon: Bell },
+    { label: 'Saved Items', shortLabel: 'Saved', href: '/saved', icon: Bookmark },
   ];
 
   const profileItems = [
@@ -76,11 +77,11 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-surface border-b border-border-base h-14 flex items-center overflow-visible">
-      <div className="container-main flex items-center justify-between gap-4 md:gap-6">
-        {/* Logo */}
-        <div className="flex items-center gap-4 flex-shrink-0">
+      <div className="container-main flex items-center h-full w-full gap-3 lg:gap-4 xl:gap-6">
+        {/* Logo + Search */}
+        <div className="flex items-center gap-3 lg:gap-4 shrink-0 min-w-0">
           <Link href="/" className="flex items-center gap-2 group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
-            <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center">
+            <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center shrink-0">
               <Zap className="text-white fill-white" size={16} />
             </div>
             <span className="text-lg font-semibold text-text-main hidden sm:block">
@@ -99,8 +100,8 @@ export function Navbar() {
               }
             }}
             className={cn(
-              "hidden md:flex items-center relative transition-all duration-300",
-              searchFocused ? "w-[320px] lg:w-[400px]" : "w-[240px] lg:w-[280px]"
+              "hidden md:flex items-center relative transition-all duration-300 shrink-0",
+              searchFocused ? "w-[280px] xl:w-[360px]" : "w-[200px] lg:w-[220px] xl:w-[260px]"
             )}
           >
             <Search className={cn(
@@ -118,8 +119,9 @@ export function Navbar() {
           </form>
         </div>
 
-        {/* Desktop Nav */}
-        <div className="hidden lg:flex items-center h-full">
+        {/* Desktop Nav — centered in remaining space */}
+        <div className="hidden lg:flex items-center justify-center flex-1 min-w-0 h-full px-2">
+          <div className="flex items-center justify-center h-full max-w-full">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -128,7 +130,7 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center min-w-[72px] h-14 gap-0.5 transition-colors relative group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
+                  "flex flex-col items-center justify-center h-14 px-2 xl:px-3 gap-0.5 transition-colors relative group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2",
                   isActive ? "text-text-main" : "text-text-muted hover:text-text-main"
                 )}
               >
@@ -140,22 +142,24 @@ export function Navbar() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-medium leading-none">
-                  {item.label}
+                <span className="text-[11px] xl:text-xs font-medium leading-none whitespace-nowrap">
+                  <span className="xl:hidden">{item.shortLabel}</span>
+                  <span className="hidden xl:inline">{item.label}</span>
                 </span>
                 {isActive && (
                   <motion.div 
                     layoutId="nav-underline"
-                    className="absolute bottom-0 left-3 right-3 h-0.5 bg-primary rounded-t-full" 
+                    className="absolute bottom-0 left-2 right-2 xl:left-3 xl:right-3 h-0.5 bg-primary rounded-t-full" 
                   />
                 )}
               </Link>
             );
           })}
+          </div>
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-0.5 sm:gap-2 overflow-visible">
+        <div className="flex items-center gap-0.5 sm:gap-2 overflow-visible shrink-0 ml-auto lg:ml-0">
           {/* Mobile Search Toggle */}
           <Button
             variant="ghost"
