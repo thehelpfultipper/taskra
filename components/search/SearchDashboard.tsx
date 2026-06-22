@@ -328,7 +328,7 @@ export default function SearchDashboard() {
                   ))
                 ) : (
                   <div className="py-10 text-center bg-surface-alt/30 rounded-3xl border border-dashed border-border-base/60">
-                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest italic">No history</p>
+                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest">No history</p>
                   </div>
                 )}
               </div>
@@ -361,7 +361,7 @@ export default function SearchDashboard() {
                   ))
                 ) : (
                   <div className="py-10 text-center bg-surface-alt/30 rounded-3xl border border-dashed border-border-base/60">
-                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest italic">No suggestions yet</p>
+                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest">No suggestions yet</p>
                   </div>
                 )}
               </div>
@@ -394,7 +394,7 @@ export default function SearchDashboard() {
                   ))
                 ) : (
                   <div className="py-10 text-center bg-surface-alt/30 rounded-3xl border border-dashed border-border-base/60">
-                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest italic">No trending terms yet</p>
+                    <p className="text-[10px] text-text-muted/40 font-black uppercase tracking-widest">No trending terms yet</p>
                   </div>
                 )}
               </div>

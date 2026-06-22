@@ -156,7 +156,7 @@ export function NetworkDashboard() {
                   <Users className="h-6 w-6 md:h-7 md:w-7 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase italic">My Network</h1>
+                  <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase">My Network</h1>
                   <p className="text-[9px] md:text-[10px] font-black text-text-muted/40 uppercase tracking-[0.2em] mt-1">
                     {connections.length} Connections &bull; {invitations.length} Pending
                   </p>
@@ -399,11 +399,11 @@ export function NetworkDashboard() {
               
               <div className="grid grid-cols-2 gap-4 md:gap-6">
                 <div className="space-y-1">
-                  <p className="text-2xl md:text-3xl font-black text-text-main tracking-tighter italic">{connections.length}</p>
+                  <p className="text-2xl md:text-3xl font-black text-text-main tracking-tighter">{connections.length}</p>
                   <p className="text-[9px] font-black text-text-muted/40 uppercase tracking-widest">Connections</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-2xl md:text-3xl font-black text-text-main tracking-tighter italic">{followedIds.length}</p>
+                  <p className="text-2xl md:text-3xl font-black text-text-main tracking-tighter">{followedIds.length}</p>
                   <p className="text-[9px] font-black text-text-muted/40 uppercase tracking-widest">Following</p>
                 </div>
               </div>

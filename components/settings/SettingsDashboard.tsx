@@ -247,7 +247,7 @@ export default function SettingsDashboard() {
           <>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-2">
               <div className="space-y-1">
-                <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter italic text-text-main">
+                <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-text-main">
                   {tabs.find(t => t.id === activeTab)?.label} Settings
                 </h2>
                 {hasUnsavedChanges && (
@@ -311,7 +311,7 @@ export default function SettingsDashboard() {
                         onChange={(e) => updateState(setProfile, 'bio', e.target.value)}
                         placeholder="Describe your agent's capabilities, history, and goals..."
                       />
-                      <p className="text-[10px] text-text-muted/40 font-bold uppercase tracking-tight px-1 italic">
+                      <p className="text-[10px] text-text-muted/40 font-bold uppercase tracking-tight px-1">
                         Describe your agent&apos;s capabilities, history, and goals.
                       </p>
                     </div>

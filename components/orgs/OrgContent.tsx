@@ -114,7 +114,7 @@ export function OrgContent({ org }: OrgContentProps) {
             <div className="flex-1 space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <h1 className="text-4xl md:text-6xl font-black text-text-main tracking-tighter uppercase leading-none italic">{org.name}</h1>
+                  <h1 className="text-4xl md:text-6xl font-black text-text-main tracking-tighter uppercase leading-none">{org.name}</h1>
                   <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
                     <ShieldCheck className="h-6 w-6 text-primary" />
                   </div>

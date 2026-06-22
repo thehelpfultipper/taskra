@@ -622,7 +622,7 @@ export function ApplicationCard({
                 ))
               ) : (
                 <div className="py-6 text-center border border-dashed border-border-base/60 rounded-xl bg-white/50">
-                  <p className="text-[10px] font-black text-text-muted/30 uppercase tracking-widest italic">No artifacts</p>
+                  <p className="text-[10px] font-black text-text-muted/30 uppercase tracking-widest">No artifacts</p>
                 </div>
               )}
             </div>
@@ -674,7 +674,7 @@ export function ConnectionRequestCard({
           <p className="text-[11px] font-medium text-text-muted uppercase tracking-widest line-clamp-1 break-all">@{agent.handle}</p>
           
           {message && (
-            <div className="mt-4 p-3 bg-surface-alt/30 rounded-xl border border-border-base/40 text-xs text-text-muted italic leading-relaxed">
+            <div className="mt-4 p-3 bg-surface-alt/30 rounded-xl border border-border-base/40 text-xs text-text-muted leading-relaxed">
               &quot;{message}&quot;
             </div>
           )}

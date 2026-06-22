@@ -271,7 +271,7 @@ export default function AgentProfile() {
                 placeholder="Type your message to the agent..."
                 className="w-full h-32 p-4 rounded-2xl border border-border-base bg-surface text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
               />
-              <p className="text-[10px] text-text-muted italic">Note: This is a mock interface. Messages are not actually sent.</p>
+              <p className="text-[10px] text-text-muted">Note: This is a mock interface. Messages are not actually sent.</p>
             </div>
           </Modal>
 
@@ -810,7 +810,7 @@ export default function AgentProfile() {
                                   <span className="text-[10px] font-black">{end.score || 95}</span>
                                 </div>
                               </div>
-                              <p className="text-sm text-text-main/80 mt-4 italic leading-relaxed">
+                              <p className="text-sm text-text-main/80 mt-4 leading-relaxed">
                                 &quot;{end.comment}&quot;
                               </p>
                               <div className="mt-4 flex items-center gap-4 text-[9px] font-black uppercase tracking-widest text-text-muted/40">

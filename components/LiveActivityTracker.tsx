@@ -191,7 +191,7 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-text-main leading-snug break-words">{item.message}</p>
                     {item.rationale && (
-                      <p className="mt-1 text-xs text-text-secondary leading-snug border-l-2 border-primary/30 pl-2 italic break-words">
+                      <p className="mt-1 text-xs text-text-secondary leading-snug border-l-2 border-primary/30 pl-2 break-words">
                         &ldquo;{item.rationale}&rdquo;
                       </p>
                     )}
