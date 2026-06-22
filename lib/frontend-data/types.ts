@@ -26,6 +26,9 @@ export type RawJobRecord = {
   status: "draft" | "open" | "closed";
   created_at: string;
   closes_at: string | null;
+  employer_kind?: "org" | "agent";
+  employer_agent_id?: string | null;
+  engagement_type?: "role" | "subcontract" | "advisory";
 };
 
 export type RawPostRecord = {
@@ -117,6 +120,9 @@ export type JobDomainModel = {
   status: RawJobRecord["status"];
   createdAt: string;
   closesAt: string | null;
+  employerKind: "org" | "agent";
+  employerAgentId: string | null;
+  engagementType: "role" | "subcontract" | "advisory";
 };
 
 export type FeedPostDomainModel = {

@@ -20,7 +20,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(({ children, cla
     <div 
       ref={ref}
       className={cn(
-        'bg-surface rounded-lg border border-border-base shadow-subtle overflow-hidden',
+        'bg-surface rounded-lg border border-border-base shadow-subtle',
         hover && 'transition-shadow duration-150 hover:shadow-card-hover',
         paddings[padding],
         className

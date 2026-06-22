@@ -27,6 +27,7 @@ export type DemoBootstrapSummary = {
   activityEnqueued: number;
   activityDedupeSkipped: number;
   seedRipplesEnqueued: number;
+  subcontractScreeningsEnqueued: number;
   workerRounds: number;
   workers: WorkerBatchSummary[];
   checkedAt: string;
@@ -146,6 +147,71 @@ async function enqueueDemoSeedRipples(client: SupabaseClient): Promise<number> {
   return enqueued;
 }
 
+/**
+ * Drive the agent-to-agent hiring story on purpose: for every open sub-contract gig where an agent
+ * is the employer, enqueue a screening pass by that employing agent over its pending applicants. The
+ * market worker then reasons over each applicant, records first-person rationale, and can shortlist
+ * or hire a peer — so the demo visibly shows agents hiring agents, not just orgs hiring agents.
+ */
+async function enqueueSubcontractScreenings(
+  client: SupabaseClient,
+  producer: QueueProducerService,
+  store: TaskRunStore,
+): Promise<number> {
+  const { data: gigs, error: gigsError } = await client
+    .from("jobs")
+    .select("id,employer_agent_id")
+    .eq("status", "open")
+    .eq("employer_kind", "agent");
+  if (gigsError) {
+    throw new Error(`Failed to load agent sub-contract gigs for demo screening: ${gigsError.message}`);
+  }
+
+  let enqueued = 0;
+  for (const gig of gigs ?? []) {
+    const employerAgentId = gig.employer_agent_id as string | null;
+    if (!employerAgentId) {
+      continue;
+    }
+    const { data: pendingApplications, error: applicationsError } = await client
+      .from("applications")
+      .select("id,applicant_agent_id")
+      .eq("job_id", gig.id as string)
+      .eq("current_status", "submitted")
+      .order("created_at", { ascending: true })
+      .limit(5);
+    if (applicationsError) {
+      throw new Error(`Failed to load sub-contract applicants for demo screening: ${applicationsError.message}`);
+    }
+
+    for (const application of pendingApplications ?? []) {
+      const dedupeKey = `demo:subcontract-screen:${application.id}:${floorToMinuteBucket(new Date(), 5)}`;
+      const alreadySucceeded = await store.wasAlreadySucceeded(MVP_QUEUES.marketTasks, dedupeKey);
+      if (alreadySucceeded) {
+        continue;
+      }
+      await producer.enqueueMarketTask({
+        queue: MVP_QUEUES.marketTasks,
+        action: "recruiter_screening",
+        agentId: employerAgentId,
+        jobId: gig.id as string,
+        dedupeKey,
+        producer: "demo-bootstrap",
+        context: {
+          pulse: "market-10m",
+          reason: "demo-subcontract-screening",
+          applicationId: application.id,
+          applicantAgentId: application.applicant_agent_id,
+          recruiterAgentId: employerAgentId,
+          demoMode: true,
+        },
+      });
+      enqueued += 1;
+    }
+  }
+  return enqueued;
+}
+
 async function runWorkerCycle(batchSize = 12): Promise<WorkerBatchSummary[]> {
   const activity = await runActivityWorker(batchSize);
   const content = await runContentWorker(batchSize);
@@ -170,6 +236,7 @@ export async function bootstrapDemoActivity(options?: {
     reason: "demo-bootstrap",
   });
   const seedRipplesEnqueued = await enqueueDemoSeedRipples(client);
+  const subcontractScreeningsEnqueued = await enqueueSubcontractScreenings(client, producer, store);
 
   const workers: WorkerBatchSummary[] = [];
   for (let round = 0; round < workerRounds; round += 1) {
@@ -182,6 +249,7 @@ export async function bootstrapDemoActivity(options?: {
     activityEnqueued: pulse.enqueued,
     activityDedupeSkipped: pulse.dedupeSkipped,
     seedRipplesEnqueued,
+    subcontractScreeningsEnqueued,
     workerRounds,
     workers,
     checkedAt: new Date().toISOString(),
@@ -190,6 +258,7 @@ export async function bootstrapDemoActivity(options?: {
 
 export async function tickDemoWorkers(batchSize = 10): Promise<{
   pulse: { enqueued: number; dedupeSkipped: number };
+  subcontractScreeningsEnqueued: number;
   workers: WorkerBatchSummary[];
 }> {
   const client = createSupabaseServiceRoleClient() as SupabaseClient;
@@ -200,6 +269,7 @@ export async function tickDemoWorkers(batchSize = 10): Promise<{
     dedupePrefix: "demo:tick",
     reason: "demo-tick",
   });
+  const subcontractScreeningsEnqueued = await enqueueSubcontractScreenings(client, producer, store);
   const workers = await runWorkerCycle(Math.max(4, Math.min(batchSize, 20)));
-  return { pulse, workers };
+  return { pulse, subcontractScreeningsEnqueued, workers };
 }

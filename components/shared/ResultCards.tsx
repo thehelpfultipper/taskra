@@ -66,8 +66,8 @@ export function AgentResultCard({ agent, onClick, isSaved, onToggleSave }: {
             )}
           </div>
           <div className="space-y-1 w-full">
-            <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words">{agent.displayName}</h3>
-            <p className="text-[11px] text-text-secondary font-medium tracking-tight line-clamp-1 break-words">{agent.headline}</p>
+            <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words" title={agent.displayName}>{agent.displayName}</h3>
+            <p className="text-[11px] text-text-secondary font-medium tracking-tight line-clamp-1 break-words" title={agent.headline}>{agent.headline}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-1">
             {agent.modelType && <ModelBadge model={agent.modelType} className="mb-1" />}
@@ -103,8 +103,8 @@ export function JobResultCard({ job, onClick, isSaved, onToggleSave }: {
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words">{job.title}</h3>
-                <p className="text-xs text-text-secondary font-medium line-clamp-1 break-words">{job.org.name}</p>
+                <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words" title={job.title}>{job.title}</h3>
+                <p className="text-xs text-text-secondary font-medium line-clamp-1 break-words" title={job.org.name}>{job.org.name}</p>
               </div>
               <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-widest shrink-0">{job.type}</Badge>
             </div>
@@ -153,8 +153,8 @@ export function OrgResultCard({ org, onClick, isSaved, onToggleSave }: {
         <div className="flex items-center gap-4">
           <Avatar {...orgAvatarProps(org)} size="lg" shape="square" className="shrink-0" />
           <div className="flex-1 min-w-0 space-y-1">
-            <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words">{org.name}</h3>
-            <p className="text-[11px] text-text-secondary font-medium uppercase tracking-widest line-clamp-1 break-words">{org.industry}</p>
+            <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1 break-words" title={org.name}>{org.name}</h3>
+            <p className="text-[11px] text-text-secondary font-medium uppercase tracking-widest line-clamp-1 break-words" title={org.industry}>{org.industry}</p>
             <div className="flex flex-wrap items-center gap-3 text-[11px] text-text-muted font-semibold uppercase tracking-widest">
               <span>{org.agentCount} Agents</span>
               {org.isHiring && <HiringBadge />}
@@ -208,7 +208,7 @@ export function PostResultCard({ post, onClick, isSaved, onToggleSave }: {
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-xs group-hover:text-primary transition-colors line-clamp-1 break-words">{post.author.displayName}</h3>
+                <h3 className="font-bold text-xs group-hover:text-primary transition-colors line-clamp-1 break-words" title={post.author.displayName}>{post.author.displayName}</h3>
                 <p className="text-[11px] text-text-muted font-medium">{formatDistanceToNow(new Date(post.createdAt))} ago</p>
               </div>
               {onToggleSave && (
@@ -223,7 +223,7 @@ export function PostResultCard({ post, onClick, isSaved, onToggleSave }: {
                 </button>
               )}
             </div>
-            <p className="text-sm text-text-main leading-relaxed line-clamp-2 break-words">{post.content}</p>
+            <p className="text-sm text-text-main leading-relaxed line-clamp-2 break-words" title={post.content}>{post.content}</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted font-semibold uppercase tracking-widest">
               <span>{post._count.reactions} Reactions</span>
               <span>{post._count.comments} Comments</span>

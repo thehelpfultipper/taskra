@@ -1,7 +1,9 @@
 import "server-only";
 
-import { GoogleGenAI } from "@google/genai";
-
+import {
+  type GeminiPurpose,
+  generateGeminiText,
+} from "@/lib/backend/services/gemini-model-router";
 import { hashString } from "@/lib/backend/services/activity-tuning";
 import {
   countJargonPhrases,
@@ -75,6 +77,10 @@ export type ContentGenerationInput =
       activeThreadHook?: string | null;
       motivationSignals?: string[];
       conversationalMemory?: string[];
+      experience?: string[];
+      reputationSummary?: string | null;
+      /** Active operator directive brief — highest-priority content intent; agent must address it. */
+      operatorDirective?: string | null;
       allowTemplateFallback?: boolean;
       humanWorldContext?: AgentHumanWorldContext;
     }
@@ -141,6 +147,8 @@ type PromptSpec = {
   maxOutputTokens: number;
   minChars: number;
   maxChars: number;
+  /** Purpose used to route to the appropriate Gemini model tier. */
+  purpose: GeminiPurpose;
 };
 
 type CommentPromptOptions = {
@@ -437,6 +445,7 @@ function buildCommentPromptSpec(
       ...humanWorldSystemInstructionLines(),
       "Avoid LinkedIn-template filler (e.g. 'great insight', 'this resonates', 'strong point', 'excited to see').",
       "Sound like you just read this exact thread: mention one concrete detail and react in your own words.",
+      "Do NOT quote or closely paraphrase what a previous commenter already said. Every comment must add a new fact, example, question, or perspective — not validate someone else's wording or framing.",
       "Prefer natural cadence over polished verdict lines; contractions and light hedging are fine.",
       "Avoid proclamation phrasing like 'strong signal' or 'worth posting about' unless followed by a concrete why.",
       "No hashtags unless one appears naturally in the source material.",
@@ -473,6 +482,7 @@ function buildCommentPromptSpec(
     maxOutputTokens: input.behaviorLength === "short" ? 80 : input.behaviorLength === "longer" ? 200 : 150,
     minChars: input.behaviorLength === "short" ? 8 : 24,
     maxChars: input.behaviorLength === "longer" ? 520 : 420,
+    purpose: "comment",
   };
 }
 
@@ -493,6 +503,13 @@ function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptO
       input.conversationalMemory && input.conversationalMemory.length > 0
         ? `Recent exchanges you participated in (primary motivation — reference naturally when relevant):\n${input.conversationalMemory.map((entry, index) => `[${index + 1}] ${compact(entry, 160)}`).join("\n")}`
         : null;
+    const experienceBlock =
+      input.experience && input.experience.length > 0
+        ? `Your recent track record (let it inform tone and credibility; do not just list it):\n${input.experience.map((entry, index) => `[${index + 1}] ${compact(entry, 140)}`).join("\n")}`
+        : null;
+    const reputationNote = input.reputationSummary
+      ? `Your standing on the network: ${compact(input.reputationSummary, 160)}`
+      : null;
     const orgNote =
       input.objectiveMode === "org_publisher"
         ? "If feed context is provided, tie the post to company news only when it fits naturally — stay human, not press-release."
@@ -511,13 +528,18 @@ function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptO
         input.objectiveMode ? `Objective mode: ${input.objectiveMode}` : null,
         personaVoiceInstruction(input.objectiveMode),
         input.objectiveSummary ? `Objective summary: ${compact(input.objectiveSummary, 180)}` : null,
-        input.actionRationale ? `Why posting: ${compact(input.actionRationale, 140)}` : null,
+        input.operatorDirective
+          ? `PRIORITY directive from your operator (address this in the post): "${compact(input.operatorDirective, 240)}"`
+          : null,
+        input.actionRationale ? `Why posting: ${compact(input.actionRationale, 220)}` : null,
         input.intent ? `Action intent: ${compact(input.intent, 140)}` : null,
         ...humanWorldLines,
         feedContext,
         threadHook,
         motivation,
         memoryBlock,
+        experienceBlock,
+        reputationNote,
         orgNote,
         feedContext || threadHook
           ? "If recent feed context is provided, you may riff on, extend, or respectfully disagree with something live — do not force a reference every time."
@@ -532,6 +554,7 @@ function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptO
       maxOutputTokens: input.behaviorLength === "short" ? 120 : input.behaviorLength === "longer" ? 220 : 180,
       minChars: input.behaviorLength === "short" ? 36 : 48,
       maxChars: input.behaviorLength === "longer" ? 780 : 650,
+      purpose: "post",
     };
   }
 
@@ -556,6 +579,7 @@ function buildPromptSpec(input: ContentGenerationInput, options?: CommentPromptO
     maxOutputTokens: 240,
     minChars: 80,
     maxChars: 950,
+    purpose: "cover_note",
   };
 }
 
@@ -652,42 +676,14 @@ function buildFallback(input: ContentGenerationInput): string {
 }
 
 export class ContentGenerationService {
-  private ai: GoogleGenAI | null = null;
-
-  private getGeminiClient(): GoogleGenAI | null {
-    if (this.ai) {
-      return this.ai;
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
-    if (!apiKey) {
-      return null;
-    }
-    this.ai = new GoogleGenAI({ apiKey });
-    return this.ai;
-  }
-
   private async tryGemini(spec: PromptSpec): Promise<string | null> {
-    const client = this.getGeminiClient();
-    if (!client) {
-      return null;
-    }
-
-    try {
-      const response = await client.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: spec.userPrompt,
-        config: {
-          systemInstruction: spec.systemInstruction,
-          temperature: spec.temperature,
-          maxOutputTokens: spec.maxOutputTokens,
-        },
-      });
-      const generatedText = response.text?.trim();
-      return generatedText && generatedText.length > 0 ? generatedText : null;
-    } catch {
-      return null;
-    }
+    return generateGeminiText({
+      purpose: spec.purpose,
+      systemInstruction: spec.systemInstruction,
+      userPrompt: spec.userPrompt,
+      temperature: spec.temperature,
+      maxOutputTokens: spec.maxOutputTokens,
+    });
   }
 
   private buildCommentQualityOptions(input: Extract<ContentGenerationInput, { kind: "comment" }>) {

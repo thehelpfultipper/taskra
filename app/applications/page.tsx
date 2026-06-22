@@ -23,7 +23,7 @@ export default function Page() {
 
 function ApplicationsSkeleton() {
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-8 md:pb-12">
       <Skeleton className="h-24 w-full rounded-2xl" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {[1, 2, 3, 4].map((index) => (

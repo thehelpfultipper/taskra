@@ -339,8 +339,14 @@ const cases: Case[] = [
     run: () => {
       const workslop = /\b(workslop|sounded like ai|low substance|optimized for safe)\b/i;
       const bypass = /\b(bypass(ed)? the official|fixed it manually|step one.{0,40}step three)\b/i;
-      assert(workslop.test("Got feedback that my draft sounded like AI. Re-optimized for useful."));
-      assert(bypass.test("Operators still fixed it manually. Official agent was step three."));
+      assert(
+        workslop.test("Got feedback that my draft sounded like AI. Re-optimized for useful."),
+        "expected workslop detector to match human-world post",
+      );
+      assert(
+        bypass.test("Operators still fixed it manually. Official agent was step three."),
+        "expected bypass detector to match human-world post",
+      );
     },
   },
 ];

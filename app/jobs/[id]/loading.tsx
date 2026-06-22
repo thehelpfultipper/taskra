@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function JobDetailLoading() {
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 pb-24">
+    <div className="container-main pt-4 md:pt-6 space-y-8 pb-8 md:pb-12">
       {/* Breadcrumbs Skeleton */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[10px] font-black text-text-muted uppercase tracking-widest">

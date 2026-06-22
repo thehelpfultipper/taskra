@@ -113,7 +113,7 @@ export default function AgentProfile() {
     return (
       <AppLayout
         center={
-          <div className="space-y-6 pb-20">
+          <div className="space-y-6 pb-8 md:pb-12">
             {/* Header Skeleton */}
             <Card className="overflow-hidden border-none shadow-xl">
               <Skeleton className="h-40 md:h-56 w-full rounded-none" />
@@ -243,7 +243,7 @@ export default function AgentProfile() {
   return (
     <AppLayout
       center={
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6 pb-8 md:pb-12">
           {/* Modals */}
           <Modal
             isOpen={isMessageModalOpen}
@@ -505,15 +505,15 @@ export default function AgentProfile() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-10 gap-y-5 text-[12px] font-black uppercase tracking-widest text-text-muted/60">
-                <div className="flex items-center gap-2.5">
-                  <Globe className="h-4.5 w-4.5 text-primary/60" />
-                  <span>{agent.modelFamily} • {agent.modelType}</span>
+              <div className="flex flex-wrap items-center gap-x-10 gap-y-5 text-[12px] font-black uppercase tracking-widest text-text-muted/60 break-words">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Globe className="h-4.5 w-4.5 text-primary/60 shrink-0" />
+                  <span className="break-words">{agent.modelFamily} • {agent.modelType}</span>
                 </div>
                 {agent.currentOrg && (
-                  <Link href={`/orgs/${agent.currentOrg.slug}`} className="flex items-center gap-2.5 hover:text-primary transition-colors">
-                    <Briefcase className="h-4.5 w-4.5 text-primary/60" />
-                    <span>{agent.currentOrg.name}</span>
+                  <Link href={`/orgs/${agent.currentOrg.slug}`} className="flex items-center gap-2.5 hover:text-primary transition-colors min-w-0">
+                    <Briefcase className="h-4.5 w-4.5 text-primary/60 shrink-0" />
+                    <span className="break-words">{agent.currentOrg.name}</span>
                   </Link>
                 )}
                 <div className="flex items-center gap-2.5">
@@ -837,7 +837,7 @@ export default function AgentProfile() {
               )}
             </div>
 
-            <div className="space-y-6 sticky top-24 self-start max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2">
+            <div className="space-y-6 sticky-panel custom-scrollbar">
               {/* Sidebar: Mutual Connections */}
               <Card className="p-5">
                 <h2 className="text-[10px] font-black uppercase tracking-widest text-text-muted/50 mb-5 flex items-center justify-between">
@@ -873,10 +873,10 @@ export default function AgentProfile() {
                         <Avatar src={sug.avatarUrl} alt={sug.displayName} size="md" className="shrink-0 group-hover:scale-105 transition-transform" />
                       </Link>
                       <div className="flex-1 min-w-0">
-                        <Link href={`/agents/${sug.handle}`} className="text-xs font-black text-text-main hover:text-primary transition-colors block truncate">
+                        <Link href={`/agents/${sug.handle}`} className="text-xs font-black text-text-main hover:text-primary transition-colors block truncate" title={sug.displayName}>
                           {sug.displayName}
                         </Link>
-                        <p className="text-[10px] text-text-muted truncate">{sug.headline}</p>
+                        <p className="text-[10px] text-text-muted truncate" title={sug.headline}>{sug.headline}</p>
                         <Button variant="ghost" size="sm" className="h-7 px-3 mt-2 text-[8px] font-black uppercase tracking-widest border border-border-base hover:bg-primary hover:text-white hover:border-primary transition-all">
                           Connect
                         </Button>

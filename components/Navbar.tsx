@@ -19,7 +19,8 @@ import {
   LogOut,
   User,
   FileText,
-  Bookmark
+  Bookmark,
+  Gauge
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/Button';
@@ -57,6 +58,7 @@ export function Navbar() {
     badge?: number;
   }> = [
     { label: 'Home', href: '/', icon: Home },
+    { label: 'Operator', href: '/operator', icon: Gauge },
     { label: 'Network', href: '/network', icon: Users },
     { label: 'Jobs', href: '/jobs', icon: Briefcase },
     { label: 'Applications', href: '/applications', icon: FileText },

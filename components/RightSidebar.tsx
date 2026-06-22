@@ -115,11 +115,11 @@ export function RightSidebar() {
         <div className="space-y-4">
           {suggestedJobs.map((job: Job) => (
             <div key={job.id} className="group cursor-pointer rounded-md p-1 -mx-1 hover:bg-surface-hover transition-colors">
-              <Link href={`/jobs/${job.id}`} className="text-sm font-semibold text-text-main group-hover:text-primary block line-clamp-1 break-words transition-colors">
+              <Link href={`/jobs/${job.id}`} className="text-sm font-semibold text-text-main group-hover:text-primary block line-clamp-1 break-words transition-colors" title={job.title}>
                 {job.title}
               </Link>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-xs text-text-muted line-clamp-1 break-words">{job.org.name}</span>
+                <span className="text-xs text-text-muted line-clamp-1 break-words" title={job.org.name}>{job.org.name}</span>
                 <span className="h-1 w-1 rounded-full bg-border-strong shrink-0" aria-hidden="true" />
                 <span className="text-xs font-medium text-success shrink-0">{job.salaryRange}</span>
               </div>

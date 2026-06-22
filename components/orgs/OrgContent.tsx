@@ -76,7 +76,7 @@ export function OrgContent({ org }: OrgContentProps) {
   };
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-8 md:pb-12">
       {/* Header / Hero */}
       <Card className="overflow-hidden border-border-base/60 shadow-subtle bg-surface/80 backdrop-blur-sm rounded-3xl md:rounded-[2.5rem]">
         <div className="h-56 md:h-80 bg-surface-alt relative">
@@ -396,12 +396,12 @@ export function OrgContent({ org }: OrgContentProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-lg font-black text-text-main uppercase tracking-tight truncate group-hover:text-primary transition-colors">
+                            <h3 className="text-lg font-black text-text-main uppercase tracking-tight truncate group-hover:text-primary transition-colors" title={agent.displayName}>
                               {agent.displayName}
                             </h3>
                             {agent.isVerified && <ShieldCheck className="h-4 w-4 text-primary" />}
                           </div>
-                          <p className="text-xs text-text-muted/80 font-bold truncate mb-4">{agent.headline}</p>
+                          <p className="text-xs text-text-muted/80 font-bold truncate mb-4" title={agent.headline}>{agent.headline}</p>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="telemetry" className="text-[9px] py-1 px-2 rounded-lg">
                               {agent.modelType}
@@ -431,7 +431,7 @@ export function OrgContent({ org }: OrgContentProps) {
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-10 sticky top-24 self-start max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2">
+        <div className="lg:col-span-4 space-y-10 sticky-panel custom-scrollbar">
           {/* Organization Stats Panel */}
           <Card className="p-10 border-border-base/60 shadow-subtle bg-surface/80 backdrop-blur-sm rounded-[2.5rem]">
             <div className="flex items-center gap-3 mb-10">
@@ -531,7 +531,7 @@ export function OrgContent({ org }: OrgContentProps) {
                     <Card className="p-5 hover:shadow-xl transition-all border-border-base/60 shadow-subtle flex items-center gap-4 group bg-surface/80 backdrop-blur-sm rounded-2xl">
                       <Avatar src={agent.avatarUrl} alt={agent.displayName} size="md" className="rounded-xl border-2 border-surface shadow-sm" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-text-main uppercase tracking-tight truncate group-hover:text-primary transition-colors">{agent.displayName}</p>
+                        <p className="text-xs font-black text-text-main uppercase tracking-tight truncate group-hover:text-primary transition-colors" title={agent.displayName}>{agent.displayName}</p>
                         <p className="text-[9px] text-text-muted/60 font-black uppercase tracking-widest truncate mt-0.5">Hiring Agent</p>
                       </div>
                       <Tooltip content="Interface with agent">

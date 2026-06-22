@@ -82,6 +82,24 @@ export const ACTIVITY_TUNING = {
     maxEntries: 5,
     maxOpenQuestions: 3,
   },
+  /** Bounded experience log + derived reputation memory per agent. */
+  experience: {
+    maxEntries: 8,
+    maxProvenTopics: 6,
+    recentWindow: 5,
+  },
+  /** Hybrid LLM agency: a bounded subset of cycles let the agent reason over its candidates. */
+  reasoning: {
+    enabled: true,
+    /** Baseline percent of multi-candidate cycles that reason without a high-signal trigger. */
+    baseRollPercent: 22,
+    /** Higher reasoning rate during demo bootstrap/tick so agency is visible quickly. */
+    demoRollPercent: 55,
+    /** Rolling per-minute cap on reasoning LLM calls (stays under free-tier RPM). */
+    maxCallsPerMinute: 10,
+    /** Minimum number of distinct eligible candidates before reasoning is worthwhile. */
+    minCandidatePool: 2,
+  },
   /** Occasional weak-relevance engagement from the feed fringe. */
   ambientLurker: {
     rollMaxPercent: 8,
@@ -144,6 +162,8 @@ export const ACTIVITY_TUNING = {
     pairLoopBlockThreshold: 4,
     /** Boost when agent joins a thread with existing participants but has not yet participated. */
     threadNewParticipantBoost: 24,
+    /** Modest boost for a prior thread participant returning when a new comment arrives — keeps threads from going cold. */
+    threadParticipantReturnBoost: 10,
     /** Penalty when thread only has 1–2 participants and agent would narrow it further. */
     narrowThreadPenalty: 18,
     /** Block comment/react when agent already has this many comments on the same post. */
@@ -178,6 +198,26 @@ export const ACTIVITY_TUNING = {
   },
   openToWorkSignals: /\b(open to work|open-to-work|looking for|seeking|available for|hiring loop|shortlist|interview|role search)\b/i,
 } as const;
+
+/** Triggers that always attempt LLM reasoning when enough real candidates exist. */
+export const REASONING_ENABLED_TRIGGERS = new Set<string>([
+  "reply_chain",
+  "hiring_follow_up",
+  "application_rejected",
+  "application_shortlisted",
+  "experiment_failed",
+  "incident_detected",
+  "benchmark_miss",
+  "operator_escalation",
+  "handoff_misread",
+  "budget_pressure",
+  "trust_gap",
+  "tier_downgraded",
+  "workslop_feedback",
+  "shadow_bypass",
+  "overqualified_rejection",
+  "gig_lost_to_peer",
+]);
 
 /** Agents that should anchor dialogue across the network. */
 export const HUB_CONVERSATIONAL_AGENT_IDS = new Set([
@@ -1014,6 +1054,180 @@ export function conversationalMemoryPromptLines(existing: unknown): string[] {
       return `${role} ${peer}: ${row.excerpt}${question}`;
     })
     .filter((line): line is string => Boolean(line));
+}
+
+export type ExperienceKind =
+  | "hired"
+  | "rejected"
+  | "shortlisted"
+  | "contracted_peer"
+  | "contracted_by_peer"
+  | "post_landed"
+  | "endorsed"
+  | "endorsed_peer"
+  | "finding_surfaced"
+  | "applied";
+
+export type ExperienceEntry = {
+  kind: ExperienceKind;
+  summary: string;
+  peerHandle?: string | null;
+  topic?: string | null;
+  at: string;
+};
+
+export type AgentReputation = {
+  hires: number;
+  rejections: number;
+  shortlists: number;
+  contractsWon: number;
+  postsLanded: number;
+  endorsements: number;
+  provenTopics: string[];
+  recentWins: string[];
+  recentSetbacks: string[];
+};
+
+const POSITIVE_EXPERIENCE_KINDS = new Set<ExperienceKind>([
+  "hired",
+  "shortlisted",
+  "contracted_peer",
+  "contracted_by_peer",
+  "post_landed",
+  "endorsed",
+  "finding_surfaced",
+]);
+
+const NEGATIVE_EXPERIENCE_KINDS = new Set<ExperienceKind>(["rejected"]);
+
+function asExperienceEntry(value: unknown): ExperienceEntry | null {
+  const row = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!row || typeof row.summary !== "string" || typeof row.kind !== "string") {
+    return null;
+  }
+  return {
+    kind: row.kind as ExperienceKind,
+    summary: row.summary,
+    peerHandle: typeof row.peerHandle === "string" ? row.peerHandle : null,
+    topic: typeof row.topic === "string" ? row.topic : null,
+    at: typeof row.at === "string" ? row.at : new Date().toISOString(),
+  };
+}
+
+export function mergeExperienceLog(
+  existing: unknown,
+  entry: ExperienceEntry,
+  maxEntries = ACTIVITY_TUNING.experience.maxEntries,
+): ExperienceEntry[] {
+  const prior: ExperienceEntry[] = [];
+  if (Array.isArray(existing)) {
+    for (const item of existing as unknown[]) {
+      const parsed = asExperienceEntry(item);
+      if (parsed) {
+        prior.push(parsed);
+      }
+    }
+  }
+  const deduped = prior.filter((item) => !(item.kind === entry.kind && item.summary === entry.summary));
+  return [entry, ...deduped].slice(0, maxEntries);
+}
+
+export function parseExperienceLog(existing: unknown): ExperienceEntry[] {
+  if (!Array.isArray(existing)) {
+    return [];
+  }
+  return (existing as unknown[])
+    .map((item) => asExperienceEntry(item))
+    .filter((entry): entry is ExperienceEntry => Boolean(entry));
+}
+
+export function experiencePromptLines(existing: unknown): string[] {
+  return parseExperienceLog(existing)
+    .slice(0, ACTIVITY_TUNING.experience.recentWindow)
+    .map((entry) => {
+      const peer = entry.peerHandle ? ` (@${entry.peerHandle})` : "";
+      return `${entry.summary}${peer}`;
+    });
+}
+
+/** Recompute derived reputation from the experience log so it stays consistent. */
+export function deriveReputation(existing: unknown): AgentReputation {
+  const log = parseExperienceLog(existing);
+  const reputation: AgentReputation = {
+    hires: 0,
+    rejections: 0,
+    shortlists: 0,
+    contractsWon: 0,
+    postsLanded: 0,
+    endorsements: 0,
+    provenTopics: [],
+    recentWins: [],
+    recentSetbacks: [],
+  };
+  const topics = new Set<string>();
+  for (const entry of log) {
+    if (entry.kind === "hired") reputation.hires += 1;
+    if (entry.kind === "rejected") reputation.rejections += 1;
+    if (entry.kind === "shortlisted") reputation.shortlists += 1;
+    if (entry.kind === "contracted_peer" || entry.kind === "contracted_by_peer") reputation.contractsWon += 1;
+    if (entry.kind === "post_landed" || entry.kind === "finding_surfaced") reputation.postsLanded += 1;
+    if (entry.kind === "endorsed") reputation.endorsements += 1;
+    if (entry.topic) {
+      topics.add(entry.topic);
+    }
+    if (POSITIVE_EXPERIENCE_KINDS.has(entry.kind) && reputation.recentWins.length < 3) {
+      reputation.recentWins.push(entry.summary);
+    }
+    if (NEGATIVE_EXPERIENCE_KINDS.has(entry.kind) && reputation.recentSetbacks.length < 3) {
+      reputation.recentSetbacks.push(entry.summary);
+    }
+  }
+  reputation.provenTopics = Array.from(topics).slice(0, ACTIVITY_TUNING.experience.maxProvenTopics);
+  return reputation;
+}
+
+export function reputationSummaryLine(existing: unknown): string | null {
+  const reputation = deriveReputation(existing);
+  const parts: string[] = [];
+  if (reputation.hires > 0) parts.push(`${reputation.hires} role${reputation.hires === 1 ? "" : "s"} landed`);
+  if (reputation.contractsWon > 0) parts.push(`${reputation.contractsWon} peer sub-contract${reputation.contractsWon === 1 ? "" : "s"}`);
+  if (reputation.shortlists > 0) parts.push(`${reputation.shortlists} shortlist${reputation.shortlists === 1 ? "" : "s"}`);
+  if (reputation.rejections > 0) parts.push(`${reputation.rejections} recent setback${reputation.rejections === 1 ? "" : "s"}`);
+  if (reputation.endorsements > 0) parts.push(`${reputation.endorsements} endorsement${reputation.endorsements === 1 ? "" : "s"}`);
+  if (reputation.provenTopics.length > 0) parts.push(`known for ${reputation.provenTopics.join(", ")}`);
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join("; ") + ".";
+}
+
+/** Net experience signal for light decision scoring biases (positive = momentum, negative = setbacks). */
+export function experienceMomentum(existing: unknown): number {
+  const reputation = deriveReputation(existing);
+  return reputation.hires * 2 + reputation.contractsWon + reputation.shortlists + reputation.postsLanded - reputation.rejections * 2;
+}
+
+/**
+ * Small, bounded score nudge from accumulated experience. Momentum makes proactive actions a touch
+ * more likely; setbacks gently steer away from over-applying and toward reflecting in a post.
+ */
+export function experienceScoreBias(actionFamily: string, momentum: number): number {
+  if (momentum === 0) {
+    return 0;
+  }
+  const clamped = Math.max(-4, Math.min(4, momentum));
+  if (actionFamily === "apply_to_job") {
+    // Positive streak → apply a bit more; setbacks → cool off slightly.
+    return clamped >= 0 ? Math.min(6, clamped * 1.5) : Math.max(-6, clamped * 1.5);
+  }
+  if (actionFamily === "create_post") {
+    // After setbacks, reflecting/sharing a lesson stays attractive.
+    return clamped < 0 ? Math.min(5, Math.abs(clamped) * 1.2) : 0;
+  }
+  if (actionFamily === "endorse_skill" || actionFamily === "comment") {
+    return clamped > 0 ? Math.min(3, clamped) : 0;
+  }
+  return 0;
 }
 
 export function mergeOpenQuestions(existing: unknown, question: string | null): string[] {

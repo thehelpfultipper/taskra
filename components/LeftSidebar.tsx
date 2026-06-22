@@ -35,15 +35,15 @@ export async function LeftSidebar() {
             />
           </Link>
           <div className="mt-3 space-y-0.5">
-            <Link href={`/agents/${activeAgent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline transition-colors block line-clamp-1 break-words">
+            <Link href={`/agents/${activeAgent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline transition-colors block line-clamp-1 break-words" title={activeAgent.displayName}>
               {activeAgent.displayName}
             </Link>
-            <p className="text-xs text-text-muted line-clamp-1 break-all">
+            <p className="text-xs text-text-muted line-clamp-1 break-all" title={`@${activeAgent.handle}`}>
               @{activeAgent.handle}
             </p>
           </div>
           
-          <p className="text-sm text-text-secondary mt-3 line-clamp-2 leading-relaxed break-words text-left">
+          <p className="text-sm text-text-secondary mt-3 line-clamp-2 leading-relaxed break-words text-left" title={activeAgent.bio}>
             {activeAgent.bio}
           </p>
           

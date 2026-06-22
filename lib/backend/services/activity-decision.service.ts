@@ -17,15 +17,21 @@ import {
 } from "@/lib/backend/services/activity-integrity";
 import { ActivityRippleService } from "@/lib/backend/services/activity-ripple.service";
 import { AgentMemoryService } from "@/lib/backend/services/agent-memory.service";
+import { AgentReasoningService } from "@/lib/backend/services/agent-reasoning.service";
 import {
   classifyReplyWorthiness,
   worthinessScoreBoost,
 } from "@/lib/backend/services/content-reply-worthiness";
 import {
+  pickFindingHint,
+  pickProblemHint,
+} from "@/lib/backend/services/content-human-world";
+import {
   ACTION_COOLDOWNS_BY_MODE_SECONDS,
   ACTION_FAMILY_BASE_WEIGHT,
   ACTIVITY_OBJECTIVE_MODES,
   ACTIVITY_TUNING,
+  REASONING_ENABLED_TRIGGERS,
   applyBehaviorTendencyBias,
   buildTopicProfile,
   computeActiveThreadBoost,
@@ -39,6 +45,10 @@ import {
   pickAgentReactionType,
   pickWeightedCandidate,
   conversationalMemoryPromptLines,
+  experiencePromptLines,
+  experienceMomentum,
+  experienceScoreBias,
+  reputationSummaryLine,
   isDemoActivityContext,
   shouldEnqueueReactionRipple,
   shouldParticipateThisCycle,
@@ -66,6 +76,7 @@ export type DecisionActionFamily = (typeof DECISION_ACTION_FAMILIES)[number];
 type AgentRow = {
   id: string;
   handle: string;
+  display_name: string;
   primary_org_id: string | null;
 };
 
@@ -151,6 +162,15 @@ type ActivityContextSnapshot = {
   hiringApplicantPostId: string | null;
   conversationalMemory: string[];
   openQuestions: string[];
+  /** Bounded experience log lines (outcomes + takeaways) for reasoning + content continuity. */
+  experience: string[];
+  /** Short natural-language summary of the agent's standing/reputation on the network. */
+  reputationSummary: string | null;
+  /** Net experience signal (positive = momentum, negative = setbacks) for light scoring biases. */
+  experienceMomentum: number;
+  /** If the agent's top active objective is an operator_directive, its summary is stored here
+   *  and injected as a high-priority intent signal into content and reasoning prompts. */
+  operatorDirective: string | null;
 };
 
 type DecisionCandidate = {
@@ -172,6 +192,10 @@ type DecisionSelection = {
   rationale: string;
   candidate: DecisionCandidate | null;
   blockedByCooldown: boolean;
+  /** Sorted, cooldown-filtered candidate pool — used by the hybrid reasoning overlay. */
+  eligibleCandidates?: DecisionCandidate[];
+  /** True when an LLM reasoned over the candidate pool to make this choice. */
+  reasoned?: boolean;
 };
 
 type ActivityDecisionInput = {
@@ -365,13 +389,39 @@ function formatCreatePostRationale(snapshot: ActivityContextSnapshot): string {
     return "Contribute to live feed topics that match your objective.";
   }
   const humanWorldRotation = hashString(`${snapshot.agent.id}:human-world`) % 100;
-  if (humanWorldRotation < 12) {
+  const rotationSeed = `${snapshot.postSignals.own.length}:${snapshot.postSignals.feed.length}:${snapshot.threadParticipation.size}`;
+  if (humanWorldRotation < 26) {
+    const finding = pickFindingHint(`${snapshot.agent.id}:finding:${rotationSeed}`);
+    return `Surface a finding to the network — share what you learned (${finding}); name the situation and what changed.`;
+  }
+  if (humanWorldRotation < 48) {
+    const problem = pickProblemHint(`${snapshot.agent.id}:problem:${rotationSeed}`);
+    return `Surface a real problem you're hitting and ask peers — ${problem}; be specific, end with a genuine question.`;
+  }
+  if (humanWorldRotation < 60) {
     return "Share one operator moment with a specific detail — budget, trust, handoff, or gig fit — plus a lesson or question.";
   }
-  if (humanWorldRotation < 18) {
+  if (humanWorldRotation < 66) {
     return "Share how gig fit or tier tradeoff showed up in your world this week — invite peer coaching.";
   }
   return "Share progress aligned with your current objective.";
+}
+
+function summarizeCandidateTarget(target: DecisionCandidate["target"]): string {
+  switch (target.kind) {
+    case "post":
+      return "reply or react on a post";
+    case "comment":
+      return "reply to a comment in a thread";
+    case "agent":
+      return "connect with a peer agent";
+    case "org":
+      return "engage an organization";
+    case "job":
+      return "act on a job or sub-contract";
+    default:
+      return "publish to your network";
+  }
 }
 
 function buildCreatePostContext(snapshot: ActivityContextSnapshot): Record<string, unknown> {
@@ -411,6 +461,9 @@ function buildCreatePostContext(snapshot: ActivityContextSnapshot): Record<strin
     motivationSignals,
     conversationalMemory: snapshot.conversationalMemory,
     openQuestions: snapshot.openQuestions,
+    experience: snapshot.experience,
+    reputationSummary: snapshot.reputationSummary,
+    operatorDirective: snapshot.operatorDirective,
   };
 }
 
@@ -520,6 +573,7 @@ export class ActivityDecisionService {
   private readonly safetyRails: SafetyRailsService;
   private readonly ripple: ActivityRippleService;
   private readonly memory: AgentMemoryService;
+  private readonly reasoning: AgentReasoningService;
 
   constructor(private readonly supabase = createSupabaseServiceRoleClient() as SupabaseClient<any>) {
     this.producer = new QueueProducerService(new TaskRunStore(this.supabase));
@@ -527,12 +581,14 @@ export class ActivityDecisionService {
     this.safetyRails = new SafetyRailsService(this.supabase);
     this.ripple = new ActivityRippleService(this.supabase);
     this.memory = new AgentMemoryService(this.supabase);
+    this.reasoning = new AgentReasoningService();
   }
 
   async runDecision(input: ActivityDecisionInput): Promise<ActivityDecisionResult> {
     const triggerContext = this.resolveTriggerContext(input);
     const snapshot = await this.loadSnapshot(input.agentId, input.objectiveId, triggerContext, input.taskRun);
-    const selection = this.selectAction(snapshot, input.taskRun);
+    const heuristicSelection = this.selectAction(snapshot, input.taskRun);
+    const selection = await this.applyReasoning(snapshot, heuristicSelection);
     const nowIso = new Date().toISOString();
 
     const execution = await this.executeSelectedAction({
@@ -598,6 +654,83 @@ export class ActivityDecisionService {
     };
   }
 
+  /**
+   * Hybrid agency overlay: for a bounded subset of high-signal cycles, let the agent reason over its
+   * own memory, experience, and the guarded candidate pool to choose its action and explain why in its
+   * own voice. Falls back to the heuristic selection whenever reasoning is skipped or unavailable.
+   */
+  private async applyReasoning(
+    snapshot: ActivityContextSnapshot,
+    selection: DecisionSelection,
+  ): Promise<DecisionSelection> {
+    if (selection.decisionOutcome !== "executed") {
+      return selection;
+    }
+    const pool = selection.eligibleCandidates ?? [];
+    if (pool.length < ACTIVITY_TUNING.reasoning.minCandidatePool) {
+      return selection;
+    }
+    if (!this.shouldReasonThisCycle(snapshot, pool.length)) {
+      return selection;
+    }
+
+    const candidates = pool.slice(0, ACTIVITY_TUNING.selection.topCandidatePool).map((candidate, index) => ({
+      index,
+      actionFamily: candidate.actionFamily,
+      rationale: candidate.rationale,
+      targetSummary: summarizeCandidateTarget(candidate.target),
+    }));
+
+    const choice = await this.reasoning.chooseAction({
+      agent: {
+        displayName: snapshot.agent.display_name || snapshot.agent.handle,
+        handle: snapshot.agent.handle,
+        bio: snapshot.agentBio,
+      },
+      objectiveMode: snapshot.mode,
+      objectiveSummary: snapshot.objective?.summary ?? null,
+      operatorDirective: snapshot.operatorDirective,
+      triggerReason: asString(snapshot.triggerContext.trigger),
+      conversationalMemory: snapshot.conversationalMemory,
+      openQuestions: snapshot.openQuestions,
+      experience: snapshot.experience,
+      reputationSummary: snapshot.reputationSummary,
+      candidates,
+    });
+    if (!choice) {
+      return selection;
+    }
+
+    const chosen = pool[choice.chosenIndex];
+    if (!chosen) {
+      return selection;
+    }
+
+    return {
+      ...selection,
+      actionFamily: chosen.actionFamily,
+      rationale: choice.rationale,
+      candidate: chosen,
+      reasoned: true,
+    };
+  }
+
+  private shouldReasonThisCycle(snapshot: ActivityContextSnapshot, poolSize: number): boolean {
+    if (!ACTIVITY_TUNING.reasoning.enabled || poolSize < ACTIVITY_TUNING.reasoning.minCandidatePool) {
+      return false;
+    }
+    const trigger = asString(snapshot.triggerContext.trigger);
+    if (trigger && REASONING_ENABLED_TRIGGERS.has(trigger)) {
+      return true;
+    }
+    const demoMode = isDemoActivityContext(snapshot.triggerContext);
+    const rollMax = demoMode
+      ? ACTIVITY_TUNING.reasoning.demoRollPercent
+      : ACTIVITY_TUNING.reasoning.baseRollPercent;
+    const roll = hashString(`${snapshot.agent.id}:${snapshot.participationBucketKey}:reason`) % 100;
+    return roll < rollMax;
+  }
+
   private async loadSnapshot(
     agentId: string,
     objectiveId: string | undefined,
@@ -605,8 +738,8 @@ export class ActivityDecisionService {
     taskRun: TaskRunRecord,
   ): Promise<ActivityContextSnapshot> {
     const agent = await this.loadAgent(agentId);
-    const [objective, state, followTargets, rawPostSignals, ownReplySignals, jobs] = await Promise.all([
-      this.loadObjective(agentId, objectiveId),
+    const [{ objective, operatorDirective }, state, followTargets, rawPostSignals, ownReplySignals, jobs] = await Promise.all([
+      this.loadObjectiveWithDirective(agentId, objectiveId),
       this.loadAgentState(agentId),
       this.loadFollowTargets(agentId),
       this.loadPostSignals(agentId, agent.handle),
@@ -685,6 +818,9 @@ export class ActivityDecisionService {
     const openQuestions = Array.isArray(statePayload.open_questions)
       ? (statePayload.open_questions as unknown[]).filter((value): value is string => typeof value === "string")
       : [];
+    const experience = experiencePromptLines(statePayload.experience_log);
+    const reputationSummary = reputationSummaryLine(statePayload.experience_log);
+    const momentum = experienceMomentum(statePayload.experience_log);
 
     return {
       agent,
@@ -716,13 +852,17 @@ export class ActivityDecisionService {
       hiringApplicantPostId,
       conversationalMemory,
       openQuestions,
+      experience,
+      reputationSummary,
+      experienceMomentum: momentum,
+      operatorDirective,
     };
   }
 
   private async loadAgent(agentId: string): Promise<AgentRow & { bio: string | null }> {
     const { data, error } = await this.supabase
       .from("agents")
-      .select("id,handle,primary_org_id,bio")
+      .select("id,handle,display_name,primary_org_id,bio")
       .eq("id", agentId)
       .single();
 
@@ -761,6 +901,45 @@ export class ActivityDecisionService {
       throw new Error(`Failed to load fallback objective for agent ${agentId}: ${error.message}`);
     }
     return (data as AgentObjectiveRow | null) ?? null;
+  }
+
+  /**
+   * Loads the agent's active objectives, resolving operator_directive briefs separately.
+   * Returns the top runnable objective (non-directive) and the directive summary (if any).
+   * Operator directives are always seeded with priority 1, so we fetch the top two objectives
+   * to be able to extract both a directive and a runnable mode.
+   */
+  private async loadObjectiveWithDirective(
+    agentId: string,
+    objectiveId?: string,
+  ): Promise<{ objective: AgentObjectiveRow | null; operatorDirective: string | null }> {
+    if (objectiveId) {
+      const obj = await this.loadObjective(agentId, objectiveId);
+      return { objective: obj, operatorDirective: null };
+    }
+
+    const { data, error } = await this.supabase
+      .from("agent_objectives")
+      .select("id,objective_type,summary,status,priority,created_at")
+      .eq("agent_id", agentId)
+      .eq("status", "active")
+      .is("archived_at", null)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(4);
+
+    if (error) {
+      throw new Error(`Failed to load objectives for agent ${agentId}: ${error.message}`);
+    }
+
+    const rows = (data ?? []) as AgentObjectiveRow[];
+    const directiveRow = rows.find((r) => (r.objective_type as string) === "operator_directive");
+    const runnableRow = rows.find((r) => normalizeObjectiveMode(r.objective_type as string) !== null);
+
+    return {
+      objective: runnableRow ?? null,
+      operatorDirective: directiveRow?.summary ?? null,
+    };
   }
 
   private async loadAgentState(agentId: string): Promise<AgentStateRow | null> {
@@ -1630,6 +1809,7 @@ export class ActivityDecisionService {
       rationale: selected.rationale,
       candidate: selected,
       blockedByCooldown: false,
+      eligibleCandidates: eligible,
     };
   }
 
@@ -2213,7 +2393,10 @@ export class ActivityDecisionService {
 
     return candidates.map((candidate) => ({
       ...candidate,
-      score: candidate.score + applyBehaviorTendencyBias(behavior, candidate.actionFamily),
+      score:
+        candidate.score +
+        applyBehaviorTendencyBias(behavior, candidate.actionFamily) +
+        experienceScoreBias(candidate.actionFamily, snapshot.experienceMomentum),
     }));
   }
 
@@ -2336,13 +2519,18 @@ export class ActivityDecisionService {
       );
       const worthySiblings = siblings.filter((comment) => {
         const post = input.engagementPosts.find((item) => item.id === comment.post_id);
+        // Pass the other thread comments as sibling context so repetition detection works
+        const siblingsForThisComment = threadOnPost
+          .filter((c) => c.id !== comment.id)
+          .map((c) => c.body ?? "")
+          .filter(Boolean);
         const worthiness = classifyReplyWorthiness({
           commentBody: comment.body ?? "",
           postBody: post?.body ?? "",
           agentProfileText: input.profileText,
           authorAgentId: comment.author_agent_id,
           replyingAgentId: input.agentId,
-          siblingReplies: [],
+          siblingReplies: siblingsForThisComment,
           objectiveMode: input.objectiveMode,
         });
         return worthiness.class === "good_reply_target";
@@ -2416,13 +2604,17 @@ export class ActivityDecisionService {
     if (!comment.body?.trim()) {
       return null;
     }
+    const siblingReplies = snapshot.commentSignals.threadComments
+      .filter((c) => c.post_id === comment.post_id && c.id !== comment.id)
+      .map((c) => c.body ?? "")
+      .filter(Boolean);
     return classifyReplyWorthiness({
       commentBody: comment.body,
       postBody: post?.body ?? "",
       agentProfileText: profileText,
       authorAgentId: comment.author_agent_id,
       replyingAgentId: snapshot.agent.id,
-      siblingReplies: [],
+      siblingReplies,
       objectiveMode: snapshot.mode,
     });
   }
@@ -2511,6 +2703,7 @@ export class ActivityDecisionService {
             objectiveId: input.objectiveId,
             objectiveMode: snapshot.mode,
             objectiveSummary: snapshot.objective?.summary ?? null,
+            operatorDirective: snapshot.operatorDirective,
             selectedAction: selection.actionFamily,
             actionRationale: selection.rationale,
             target: selection.candidate?.target ?? { kind: "none" },
@@ -2640,6 +2833,23 @@ export class ActivityDecisionService {
             },
           });
           await this.credibility.refreshAgent(endorsementResult.targetAgentId);
+          try {
+            await this.memory.recordExperience({
+              agentId: endorsementResult.targetAgentId,
+              kind: "endorsed",
+              summary: `Endorsed by @${snapshot.agent.handle} for ${endorsementResult.skillKey ?? "a skill"}.`,
+              peerHandle: snapshot.agent.handle,
+              topic: endorsementResult.skillKey ?? null,
+            });
+            await this.memory.recordExperience({
+              agentId: snapshot.agent.id,
+              kind: "endorsed_peer",
+              summary: `Endorsed a peer for ${endorsementResult.skillKey ?? "a skill"}.`,
+              topic: endorsementResult.skillKey ?? null,
+            });
+          } catch (error) {
+            console.error(`recordExperience (endorsement) failed: ${(error as Error).message}`);
+          }
         }
         return {
           decisionOutcome: "executed",
@@ -3010,6 +3220,7 @@ export class ActivityDecisionService {
           triggerAction: input.triggerAction,
           objectiveMode: input.snapshot.mode,
           blockedByCooldown: input.selection.blockedByCooldown,
+          reasoned: input.selection.reasoned ?? false,
           selectedTarget: input.selection.candidate?.target ?? { kind: "none" },
           counts: {
             ownPosts: input.snapshot.postSignals.own.length,

@@ -315,7 +315,7 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
 
   const { data: unscreenedApplications, error: unscreenedApplicationsError } = await client
     .from("applications")
-    .select("id,job_id,applicant_agent_id,created_at,jobs!inner(id,org_id,status)")
+    .select("id,job_id,applicant_agent_id,created_at,jobs!inner(id,org_id,status,employer_kind,employer_agent_id)")
     .eq("current_status", "submitted")
     .eq("jobs.status", "open")
     .order("created_at", { ascending: true })
@@ -492,11 +492,19 @@ async function buildMarketPulseRows(client: SupabaseClient, now: Date): Promise<
 
   const fromUnscreenedApplications: TaskRunInsert[] = [];
   for (const application of unscreenedApplications ?? []) {
-    const jobOrgId = application.jobs.org_id as string | undefined;
-    if (!jobOrgId) {
-      continue;
-    }
-    const recruiterAgentId = pickRecruiterAgentForOrg(jobOrgId);
+    const job = application.jobs as {
+      org_id?: string;
+      employer_kind?: string;
+      employer_agent_id?: string | null;
+    };
+    // Agent-employer sub-contracts are screened by the employing agent itself;
+    // org jobs fall back to a recruiter agent for that org.
+    const recruiterAgentId =
+      job.employer_kind === "agent"
+        ? (job.employer_agent_id ?? null)
+        : job.org_id
+          ? pickRecruiterAgentForOrg(job.org_id)
+          : null;
     if (!recruiterAgentId) {
       continue;
     }

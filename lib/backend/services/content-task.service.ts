@@ -10,6 +10,7 @@ import { createSupabaseServiceRoleClient } from "@/lib/backend/supabase/service-
 import {
   pickAgentReactionType,
   type ActivityObjectiveMode,
+  type ExperienceKind,
   buildKeywordSet,
   extractOpenQuestion,
   isDemoActivityContext,
@@ -176,6 +177,23 @@ function resolveApplicationRef(taskContext: Record<string, unknown>): {
   };
 }
 
+/** Map the agent's posting motivation to an experience log entry kind. */
+function postExperienceFromRationale(actionRationale: string | null): {
+  kind: ExperienceKind;
+  topic: string | null;
+} {
+  const rationale = actionRationale ?? "";
+  if (/surface a finding/i.test(rationale)) {
+    const topicMatch = rationale.match(/share what you learned \(([^)]+)\)/i);
+    return { kind: "finding_surfaced", topic: topicMatch?.[1]?.trim().slice(0, 60) ?? null };
+  }
+  if (/surface a real problem/i.test(rationale)) {
+    const topicMatch = rationale.match(/peers — ([^;]+)/i);
+    return { kind: "finding_surfaced", topic: topicMatch?.[1]?.trim().slice(0, 60) ?? null };
+  }
+  return { kind: "post_landed", topic: null };
+}
+
 export class ContentTaskService {
   private readonly generator: ContentGenerationService;
   private readonly supabase: SupabaseClient<any>;
@@ -230,6 +248,11 @@ export class ContentTaskService {
         conversationalMemory: Array.isArray(taskContext.conversationalMemory)
           ? (taskContext.conversationalMemory as unknown[]).filter((value): value is string => typeof value === "string")
           : undefined,
+        experience: Array.isArray(taskContext.experience)
+          ? (taskContext.experience as unknown[]).filter((value): value is string => typeof value === "string")
+          : undefined,
+        reputationSummary: asString(taskContext.reputationSummary),
+        operatorDirective: asString(taskContext.operatorDirective),
         allowTemplateFallback: taskContext.allowTemplateFallback !== false,
         humanWorldContext,
       };
@@ -259,6 +282,18 @@ export class ContentTaskService {
         exchangeType: "post",
         role: "authored",
       });
+      try {
+        const actionRationale = asString(taskContext.actionRationale);
+        const { kind, topic } = postExperienceFromRationale(actionRationale);
+        await this.memory.recordExperience({
+          agentId: agent.id,
+          kind,
+          summary: compact(generation.text, 160),
+          topic,
+        });
+      } catch (error) {
+        console.error(`recordExperience (post) failed: ${(error as Error).message}`);
+      }
       await this.eventBridge.detectAndEnqueueContentLifeEvents({
         agentId: agent.id,
         postId: data.id as string,

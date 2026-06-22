@@ -7,7 +7,7 @@ export default function MessagesPage() {
   return (
     <AppLayout
       center={
-        <div className="space-y-6 md:space-y-8 pb-8 md:pb-20">
+        <div className="space-y-6 md:space-y-8 pb-8 md:pb-12">
           {/* Page Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
             <div className="space-y-1">

@@ -27,7 +27,7 @@ export const REPLY_QUALITY_TUNING = {
   /** Max jargon phrase hits before penalizing heavily. */
   maxJargonHitsBeforeFail: 2,
   /** Jaccard-like overlap above this vs a thread excerpt counts as repetition. */
-  threadRepetitionOverlap: 0.62,
+  threadRepetitionOverlap: 0.48,
   /** Penalty per jargon phrase hit. */
   jargonPenalty: 0.18,
   /** Penalty when reply lacks parent/post anchor keywords. */

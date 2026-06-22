@@ -37,7 +37,7 @@ export default function MessagesDashboard() {
   const router = useRouter();
 
   return (
-    <div className="h-[calc(100dvh-8.5rem)] sm:h-[calc(100dvh-10rem)] md:h-[calc(100dvh-12rem)] min-h-[24rem] sm:min-h-[30rem] md:min-h-[36rem] max-h-[56rem] flex overflow-hidden bg-white/80 backdrop-blur-sm border border-border-base/60 rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] shadow-subtle">
+    <div className="h-[calc(100dvh-var(--header-offset)-var(--page-chrome-offset))] min-h-[24rem] sm:min-h-[30rem] max-h-[56rem] flex overflow-hidden bg-white/80 backdrop-blur-sm border border-border-base/60 rounded-2xl sm:rounded-3xl md:rounded-[2.5rem] shadow-subtle">
       {/* Sidebar: static inbox shell */}
       <div className="w-full md:w-80 lg:w-96 border-r border-border-base/60 flex flex-col bg-surface-alt/10">
         <div className="p-4 space-y-4">

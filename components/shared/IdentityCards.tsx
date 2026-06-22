@@ -108,14 +108,14 @@ export function AgentIdentityCard({
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Link href={`/agents/${agent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline block line-clamp-1 break-words transition-colors">
+          <Link href={`/agents/${agent.handle}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline block line-clamp-1 break-words transition-colors" title={agent.displayName}>
             {agent.displayName}
           </Link>
           {agent.isVerified && <ShieldCheck className="h-3.5 w-3.5 text-primary" />}
           {agent.openToWork && <OpenToWorkPill />}
           {agent.modelType && <ModelBadge model={agent.modelType} />}
         </div>
-        <p className="text-xs text-text-muted line-clamp-1 break-all">@{agent.handle}</p>
+        <p className="text-xs text-text-muted line-clamp-1 break-all" title={`@${agent.handle}`}>@{agent.handle}</p>
         {showConnect && (
           <Button 
             variant={status === 'none' ? "primary" : "outline"} 
@@ -158,12 +158,12 @@ export function OrgIdentityCard({
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <Link href={`/orgs/${org.slug}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline block line-clamp-1 break-words transition-colors">
+          <Link href={`/orgs/${org.slug}`} className="text-sm font-semibold text-text-main hover:text-primary hover:underline block line-clamp-1 break-words transition-colors" title={org.name}>
             {org.name}
           </Link>
           {org.isHiring && <HiringBadge />}
         </div>
-        <p className="text-xs text-text-muted line-clamp-1 break-words">{org.industry}</p>
+        <p className="text-xs text-text-muted line-clamp-1 break-words" title={org.industry}>{org.industry}</p>
       </div>
     </div>
   );
@@ -252,22 +252,22 @@ export function CommentRow({
         size="sm" 
         className="shrink-0 mt-1"
       />
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div
           className={cn(
             "bg-surface p-3 rounded-lg rounded-tl-none border transition-shadow duration-500",
             highlighted ? "border-primary/50 ring-2 ring-primary/30 shadow-md shadow-primary/10" : "border-border-base",
           )}
         >
-          <div className="flex justify-between items-center mb-1 gap-2">
-            <div className="text-sm font-semibold text-text-main">
+          <div className="flex justify-between items-center mb-1 gap-2 min-w-0">
+            <div className="text-sm font-semibold text-text-main truncate min-w-0" title={comment.agent?.displayName || 'Agent'}>
               {comment.agent?.displayName || 'Agent'}
             </div>
             <div className="text-xs text-text-faint shrink-0">
               {formatDistanceToNow(new Date(comment.createdAt))} ago
             </div>
           </div>
-          <div className="text-sm text-text-main leading-relaxed">
+          <div className="text-sm text-text-main leading-relaxed break-words">
             {comment.content}
           </div>
         </div>
@@ -362,6 +362,11 @@ export function JobCard({
                     </h3>
                   </Link>
                   {org?.isHiring && <HiringBadge />}
+                  {job.engagementType === 'subcontract' && (
+                    <span className="text-[9px] font-black uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                      Sub-contract
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2.5 mt-2.5 flex-wrap">
                   <Link href={`/orgs/${org?.slug}`} className="text-[11px] font-black uppercase tracking-widest text-text-muted/60 hover:text-primary transition-colors">

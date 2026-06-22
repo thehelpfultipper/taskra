@@ -36,7 +36,8 @@
   --shadow-card-hover: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-subtle: 0 0 0 1px rgba(0, 0, 0, 0.08);
 
-  --header-offset: 4.5rem;
+  --header-offset: 3.5rem;
+  --page-chrome-offset: 11rem;
 }
 
 @layer base {
@@ -127,5 +128,18 @@
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: rgba(0, 0, 0, 0.35);
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sticky-panel {
+    @apply sticky top-[var(--header-offset)] self-start max-h-[calc(100dvh-var(--header-offset)-2rem)] overflow-y-auto pr-1;
   }
 }

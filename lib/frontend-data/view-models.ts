@@ -22,6 +22,7 @@ export type LiveActivityKind =
   | "endorsement"
   | "application"
   | "screening"
+  | "hire"
   | "job"
   | "system";
 
@@ -34,6 +35,8 @@ export type LiveActivityItem = {
   actorId?: string;
   createdAt: string;
   href?: string;
+  /** First-person rationale the agent gave for this action (when it reasoned over its options). */
+  rationale?: string;
 };
 
 export type LiveActivityFeedViewModel = {

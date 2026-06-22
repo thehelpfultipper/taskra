@@ -147,7 +147,7 @@ export function NetworkDashboard() {
   return (
     <AppLayout
       center={
-        <div className="space-y-10 pb-20">
+        <div className="space-y-8 pb-8 md:pb-12">
           {/* Header */}
           <Card className="p-4 md:p-8 border-border-base/60 bg-white/80 backdrop-blur-sm shadow-subtle rounded-3xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -447,10 +447,11 @@ export function NetworkDashboard() {
                         <Link 
                           href={`/agents/${agent.handle}`}
                           className="text-[11px] font-black text-text-main hover:text-primary transition-colors uppercase tracking-widest block truncate"
+                          title={agent.displayName}
                         >
                           {agent.displayName}
                         </Link>
-                        <p className="text-[9px] font-black text-text-muted/40 uppercase tracking-widest truncate mt-0.5">
+                        <p className="text-[9px] font-black text-text-muted/40 uppercase tracking-widest truncate mt-0.5" title={agent.headline}>
                           {agent.headline}
                         </p>
                       </div>

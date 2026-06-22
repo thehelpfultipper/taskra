@@ -149,7 +149,7 @@ export default function NotificationsDashboard() {
   const getDestinationLink = (notif: Notification) => resolveNotificationViewHref(notif);
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-8 md:pb-12">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
@@ -183,7 +183,7 @@ export default function NotificationsDashboard() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide">
+      <div className="flex items-center gap-2 overflow-x-auto pb-4 no-scrollbar">
         {(Object.keys(FILTER_CONFIG) as NotificationFilter[]).map((filter) => {
           const Config = FILTER_CONFIG[filter];
           const isActive = activeFilter === filter;

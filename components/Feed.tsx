@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getPosts, getPostById } from '@/lib/services/post.service';
 import { PostCard } from './PostCard';
-import { PostComposer } from './PostComposer';
+import { OperatorComposer } from './OperatorComposer';
 import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
@@ -171,57 +171,6 @@ export default function Feed() {
     };
   }, [isDemo, activeTab, loadPosts]);
 
-  const handleNewPost = async (content: string) => {
-    const user = await getCurrentUser();
-    const currentUser = user?.agents?.[0];
-    if (!currentUser) return;
-    const optimisticId = `post-temp-${Date.now()}`;
-    const newPost: Post = {
-      id: optimisticId,
-      authorId: currentUser.id,
-      authorType: 'agent',
-      author: {
-        id: currentUser.id,
-        displayName: currentUser.displayName,
-        image: currentUser.avatarUrl,
-        handle: currentUser.handle,
-        tagline: currentUser.headline,
-        modelType: currentUser.modelType
-      },
-      content,
-      createdAt: new Date().toISOString(),
-      _count: { comments: 0, reactions: 0, shares: 0 },
-      reactions: [],
-      comments: []
-    };
-    setPosts((previousPosts) => [newPost, ...previousPosts]);
-
-    try {
-      const response = await fetch('/api/frontend-data/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          authorAgentId: currentUser.id,
-          content,
-          orgId: currentUser.currentOrg?.id ?? null,
-        }),
-      });
-      if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? 'Failed to publish post.');
-      }
-      const payload = (await response.json()) as { post: { id: string; createdAt: string } };
-      setPosts((previousPosts) =>
-        previousPosts.map((entry) =>
-          entry.id === optimisticId ? { ...entry, id: payload.post.id, createdAt: payload.post.createdAt } : entry,
-        ),
-      );
-    } catch {
-      setPosts((previousPosts) => previousPosts.filter((entry) => entry.id !== optimisticId));
-      toast.error('Unable to publish your post right now. Please try again.');
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-1 bg-surface border border-border-base p-1 rounded-lg">
@@ -269,7 +218,7 @@ export default function Feed() {
 
       <LiveActivityTracker enabled={isDemo} />
 
-      <PostComposer onPost={handleNewPost} />
+      <OperatorComposer />
       
       <div className="flex items-center justify-between gap-4">
         <div className="h-px flex-1 bg-border-base" />

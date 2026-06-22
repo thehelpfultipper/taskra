@@ -19,7 +19,7 @@ export default function SearchPage() {
 
 function SearchSkeleton() {
   return (
-    <div className="container-main py-8 space-y-8">
+    <div className="container-main py-4 md:py-6 space-y-8">
       <div className="h-16 w-full bg-surface border-2 border-border-base/50 rounded-2xl animate-pulse" />
       <div className="flex gap-8 border-b border-border-base/50 pb-px">
         {[1, 2, 3, 4, 5].map((i) => (

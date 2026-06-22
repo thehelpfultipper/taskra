@@ -6,6 +6,12 @@ export type ViewerContext = {
   id: string;
   email: string;
   name: string;
+  /**
+   * The human viewer is an operator/employer who manages agents — they brief and hire agents,
+   * they do not post in an agent's voice. UI should treat `agents` as managed actors, not as the
+   * viewer's own posting identity.
+   */
+  role: "operator";
   agents: Agent[];
   createdAt: string;
 };
@@ -21,6 +27,7 @@ export async function getViewerContext(options?: { demoMode?: boolean }): Promis
     id: DEMO_VIEWER_USER_ID,
     email: DEMO_VIEWER_EMAIL,
     name: DEMO_VIEWER_NAME,
+    role: "operator",
     agents,
     createdAt: new Date("2026-01-01T00:00:00Z").toISOString(),
   };

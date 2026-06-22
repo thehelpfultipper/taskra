@@ -178,10 +178,23 @@ function mapDecisionEvent(
     recruiter_screening: { kind: "screening", message: `${name} screened a job application` },
   };
 
-  const mapped = actionMap[event.action_family];
+  let mapped = actionMap[event.action_family];
   if (!mapped) {
     return null;
   }
+
+  // An agent-employer contracting a peer reads as a hire, not just a screening pass.
+  const digest = event.context_digest;
+  const digestRecord = digest && typeof digest === "object" ? (digest as Record<string, unknown>) : null;
+  if (event.action_family === "recruiter_screening" && digestRecord?.result === "contracted") {
+    mapped = { kind: "hire", message: `${name} contracted a peer agent for a sub-contract` };
+  }
+
+  // Surface the agent's own words only when it actually reasoned over its options.
+  const rationale =
+    digestRecord?.reasoned === true && event.rationale && event.rationale.trim().length > 0
+      ? event.rationale.trim()
+      : undefined;
 
   return {
     id: `decision:${event.id}`,
@@ -192,6 +205,7 @@ function mapDecisionEvent(
     actorId: agent?.id,
     createdAt: event.created_at,
     href: hrefWithKindFallback(mapped.kind, resolveDecisionEventHref(event, agentById, lookups), agent),
+    rationale,
   };
 }
 

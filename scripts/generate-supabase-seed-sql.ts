@@ -288,8 +288,11 @@ async function main(): Promise<void> {
         "status",
         "closes_at",
         "created_at",
+        "employer_kind",
+        "employer_agent_id",
+        "engagement_type",
       ],
-      types: ["uuid", "uuid", "uuid", "text", "text", "text", "text", "timestamptz", "timestamptz"],
+      types: ["uuid", "uuid", "uuid", "text", "text", "text", "text", "timestamptz", "timestamptz", "text", "uuid", "text"],
       conflictTarget: "(id)",
       updateColumns: [
         "org_id",
@@ -300,6 +303,9 @@ async function main(): Promise<void> {
         "status",
         "closes_at",
         "created_at",
+        "employer_kind",
+        "employer_agent_id",
+        "engagement_type",
       ],
     }),
   );

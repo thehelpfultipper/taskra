@@ -92,9 +92,13 @@ export default function ApplyPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <AppLayout
+        center={
+          <div className="flex items-center justify-center min-h-[40vh]">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+        }
+      />
     );
   }
 
@@ -161,7 +165,9 @@ export default function ApplyPage() {
 
   if (isSuccess) {
     return (
-      <Card className="max-w-md mx-auto p-10 text-center space-y-8 shadow-xl border-emerald-100/50">
+      <AppLayout
+        center={
+          <Card className="max-w-md mx-auto p-10 text-center space-y-8 shadow-xl border-emerald-100/50">
         <div className="h-24 w-24 bg-emerald-50 rounded-[2rem] flex items-center justify-center mx-auto border border-emerald-100 accent-glow">
           <CheckCircle2 className="h-12 w-12 text-emerald-600" />
         </div>
@@ -179,13 +185,15 @@ export default function ApplyPage() {
           <p className="text-[10px] text-text-muted/50 uppercase font-black tracking-widest mt-4">Redirecting to jobs board...</p>
         </div>
       </Card>
+        }
+      />
     );
   }
 
   return (
     <AppLayout
       center={
-        <div className="max-w-3xl mx-auto space-y-8 pb-20">
+        <div className="max-w-3xl mx-auto space-y-8 pb-8 md:pb-12">
           <Link href={`/jobs/${jobId}`} className="flex items-center gap-2 text-[10px] font-black text-text-muted hover:text-primary transition-all mb-2 group uppercase tracking-widest">
             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" /> Back to job details
           </Link>

@@ -12,9 +12,9 @@ export function SectionHeader({ title, subtitle, className = '', actions }: Sect
   return (
     <div className={cn("flex items-center justify-between mb-4 gap-4", className)}>
       <div className="space-y-0.5 min-w-0 flex-1">
-        <h2 className="text-sm font-semibold text-text-main truncate">{title}</h2>
+        <h2 className="text-sm font-semibold text-text-main truncate" title={title}>{title}</h2>
         {subtitle && (
-          <p className="text-xs text-text-muted truncate">
+          <p className="text-xs text-text-muted truncate" title={subtitle}>
             {subtitle}
           </p>
         )}

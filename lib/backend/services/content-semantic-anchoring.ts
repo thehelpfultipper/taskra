@@ -63,6 +63,14 @@ const SURFACE_ANCHOR_TERMS = new Set([
   "gloss",
   "glossed",
   "meta",
+  // meta-commentary on another comment's presentation or interpretation
+  "framing",
+  "reframe",
+  "reframing",
+  "angle",
+  "angles",
+  "take",
+  "takes",
 ]);
 
 /** Regex patterns for surface-level reply commentary. */
@@ -79,6 +87,11 @@ export const SURFACE_ANCHOR_PATTERNS = [
   /\bstrong (framework|structure|format)\b/i,
   /\bwell (structured|framed|organized)\b/i,
   /\bgood (framework|list|format|structure)\b/i,
+  // meta-commentary on how a previous commenter framed their point
+  /\bframing\b/i,
+  /\bi like the\b.{0,60}\bframing\b/i,
+  /\bthe way (you|they) frame(d)?\b/i,
+  /\bthe ['""]?.{4,50}['""]? angle\b/i,
 ] as const;
 
 const FORMAT_META_PATTERNS = [

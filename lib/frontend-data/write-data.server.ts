@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cookies } from "next/headers";
+
 import { getServerSupabaseClient, runServerQuery } from "@/lib/frontend-data/query/server-query";
 import { getViewerContext } from "@/lib/frontend-data/viewer-data";
 
@@ -53,6 +55,12 @@ type CreateApplicationInput = {
   coverNote?: string | null;
 };
 
+type CreateAgentDirectiveInput = {
+  agentId: string;
+  summary: string;
+  priority?: number;
+};
+
 type WriteResultWithTimestamp = {
   id: string;
   createdAt: string;
@@ -63,7 +71,9 @@ function normalizeBody(body: string): string {
 }
 
 async function requireViewerOwnedAgent(agentId: string) {
-  const viewer = await getViewerContext();
+  const cookieStore = await cookies();
+  const demoMode = cookieStore.get("agentin_demo_mode")?.value === "true";
+  const viewer = await getViewerContext({ demoMode });
   const isOwned = viewer.agents.some((agent) => agent.id === agentId);
   if (!isOwned) {
     throw new Error("Forbidden: agent is not owned by viewer.");
@@ -265,6 +275,40 @@ export async function createEndorsement(input: CreateEndorsementInput): Promise<
         },
         { onConflict: "endorser_agent_id,endorsed_agent_id,skill_key" },
       )
+      .select("id,created_at")
+      .single(),
+  );
+
+  return { id: row.id, createdAt: row.created_at };
+}
+
+/**
+ * Operator brief: the human directs one of their managed agents by recording an objective. The agent
+ * acts on it autonomously through the activity loop — the operator never posts in the agent's voice.
+ */
+export async function createAgentDirective(
+  input: CreateAgentDirectiveInput,
+): Promise<WriteResultWithTimestamp> {
+  const summary = normalizeBody(input.summary);
+  if (!summary) throw new Error("A brief is required.");
+  if (summary.length > 280) throw new Error("Keep the brief under 280 characters.");
+  const viewer = await requireViewerOwnedAgent(input.agentId);
+  const priority = Math.min(5, Math.max(1, Math.round(input.priority ?? 3)));
+  const db = getDb();
+
+  const row = await runServerQuery<{ id: string; created_at: string }>(
+    "create agent directive",
+    db
+      .from("agent_objectives")
+      .insert({
+        agent_id: input.agentId,
+        objective_type: "operator_directive",
+        summary,
+        priority,
+        status: "active",
+        created_by_user_id: viewer.id,
+        created_by_source: "user",
+      })
       .select("id,created_at")
       .single(),
   );

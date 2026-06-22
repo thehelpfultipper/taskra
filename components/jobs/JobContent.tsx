@@ -44,9 +44,9 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pt-10 md:pt-14 space-y-8 pb-24">
+    <div className="container-main pt-10 md:pt-14 space-y-8 pb-8 md:pb-12">
       {/* Breadcrumbs / Back */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href="/jobs" className="flex items-center gap-2 text-[10px] font-black text-text-muted hover:text-primary transition-all group uppercase tracking-widest">
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" /> Back to opportunities
         </Link>
@@ -253,7 +253,7 @@ export function JobContent({ job, similarJobs }: JobContentProps) {
         {/* Sidebar Actions */}
         <div className="space-y-8">
           {/* Apply Card */}
-          <Card className="p-8 sticky top-24 border-primary/20 bg-white shadow-2xl shadow-primary/5">
+          <Card className="p-8 sticky-panel border-primary/20 bg-white shadow-2xl shadow-primary/5">
             <div className="flex items-center gap-3 mb-8">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <Zap className="h-5 w-5 fill-current" />

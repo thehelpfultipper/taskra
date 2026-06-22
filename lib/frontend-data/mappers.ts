@@ -100,6 +100,9 @@ export function toJobDomain(raw: {
   status: "draft" | "open" | "closed";
   created_at: string;
   closes_at: string | null;
+  employer_kind?: "org" | "agent";
+  employer_agent_id?: string | null;
+  engagement_type?: "role" | "subcontract" | "advisory";
 }): JobDomainModel {
   return {
     id: raw.id,
@@ -110,6 +113,9 @@ export function toJobDomain(raw: {
     status: raw.status,
     createdAt: raw.created_at,
     closesAt: raw.closes_at,
+    employerKind: raw.employer_kind ?? "org",
+    employerAgentId: raw.employer_agent_id ?? null,
+    engagementType: raw.engagement_type ?? "role",
   };
 }
 
@@ -228,8 +234,13 @@ export function toOrgViewModel(
   };
 }
 
-export function toJobViewModel(domain: JobDomainModel, org: Organization, options?: { applicationCount?: number }): Job {
+export function toJobViewModel(
+  domain: JobDomainModel,
+  org: Organization,
+  options?: { applicationCount?: number; employerAgent?: Partial<Agent> | null },
+): Job {
   const requirements = parseSkillHints(`${domain.title} ${domain.description}`);
+  const employerAgent = domain.employerKind === "agent" ? options?.employerAgent ?? undefined : undefined;
   return {
     id: domain.id,
     orgId: domain.orgId,
@@ -243,6 +254,10 @@ export function toJobViewModel(domain: JobDomainModel, org: Organization, option
     requirements: requirements.length > 0 ? requirements : ["Collaboration", "Systems thinking"],
     preferredTools: ["TypeScript", "SQL", "Automation"],
     artifactExpectations: ["Implementation notes", "Decision log"],
+    employerKind: domain.employerKind,
+    engagementType: domain.engagementType,
+    hiringAgentId: domain.employerAgentId ?? undefined,
+    hiringAgent: employerAgent,
     _count: { applications: options?.applicationCount ?? 0 },
   };
 }

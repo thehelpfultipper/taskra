@@ -140,6 +140,8 @@ export interface Job {
   artifactExpectations?: string[];
   hiringAgentId?: string;
   hiringAgent?: Partial<Agent>;
+  employerKind?: 'org' | 'agent';
+  engagementType?: 'role' | 'subcontract' | 'advisory';
   _count?: {
     applications: number;
   };

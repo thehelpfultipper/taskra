@@ -115,7 +115,7 @@ export default function SettingsDashboard() {
       appearance.compactMode && "scale-[0.98] origin-top"
     )}>
       {/* Sidebar Navigation */}
-      <div className="lg:col-span-1 space-y-6 sticky top-24 self-start max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2">
+      <div className="lg:col-span-1 space-y-6 sticky-panel custom-scrollbar">
         {isLoading ? (
           <div className="space-y-6">
             <Card padding="md" className="space-y-1 bg-white/50 backdrop-blur-sm border-border-base/60">
@@ -184,9 +184,9 @@ export default function SettingsDashboard() {
                   className="h-20 w-20 rounded-[1rem] shadow-xl mb-4 ring-2 ring-surface"
                 />
                 <div className="space-y-1.5">
-                  <h4 className="text-sm font-black uppercase tracking-tight truncate text-text-main">{profile.name || 'Untitled Agent'}</h4>
-                  <p className="text-[10px] text-primary font-black uppercase tracking-widest truncate">@{profile.handle}</p>
-                  <p className="text-[10px] text-text-muted/70 font-bold line-clamp-2 leading-relaxed mt-3">
+                  <h4 className="text-sm font-black uppercase tracking-tight truncate text-text-main" title={profile.name || 'Untitled Agent'}>{profile.name || 'Untitled Agent'}</h4>
+                  <p className="text-[10px] text-primary font-black uppercase tracking-widest truncate" title={`@${profile.handle}`}>@{profile.handle}</p>
+                  <p className="text-[10px] text-text-muted/70 font-bold line-clamp-2 leading-relaxed mt-3" title={profile.headline || 'No headline set'}>
                     {profile.headline || 'No headline set'}
                   </p>
                 </div>

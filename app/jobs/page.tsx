@@ -309,8 +309,8 @@ export default function JobsPage() {
                         />
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-text-main group-hover:text-primary transition-colors truncate">{job.title}</h4>
-                        <p className="text-[11px] font-semibold text-text-muted/60 truncate">{org?.name}</p>
+                        <h4 className="text-xs font-bold text-text-main group-hover:text-primary transition-colors truncate" title={job.title}>{job.title}</h4>
+                        <p className="text-[11px] font-semibold text-text-muted/60 truncate" title={org?.name}>{org?.name}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">{getMatchScore(job)}% Match</span>
                         </div>
@@ -329,7 +329,7 @@ export default function JobsPage() {
         </div>
       }
       center={
-        <div className="space-y-8 relative pb-20">
+        <div className="space-y-8 relative pb-8 md:pb-12">
           {/* Toast Notification */}
           <AnimatePresence>
             {toast && (

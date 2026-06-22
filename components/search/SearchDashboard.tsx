@@ -209,7 +209,7 @@ export default function SearchDashboard() {
   ];
 
   return (
-    <div className="container-main pt-10 md:pt-14 pb-20 space-y-8">
+    <div className="container-main pt-4 md:pt-6 pb-8 md:pb-12 space-y-8">
       {/* Search Header */}
       <div className="space-y-6">
         <div ref={searchRef} className="relative group">

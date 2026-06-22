@@ -343,6 +343,9 @@ export function rankRippleResponders(input: {
 
       if (!input.threadParticipants.has(agentId)) {
         score += integrity.threadNewParticipantBoost;
+      } else {
+        // Prior participant returning to continue context — modest boost so thread doesn't go cold
+        score += integrity.threadParticipantReturnBoost;
       }
 
       return { agentId, score };

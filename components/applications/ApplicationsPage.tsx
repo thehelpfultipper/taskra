@@ -223,7 +223,7 @@ export default function ApplicationsPage() {
   ];
 
   return (
-    <div className="pb-20">
+    <div className="pb-8 md:pb-12">
       <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-3">
@@ -496,7 +496,7 @@ export default function ApplicationsPage() {
                         <FileText size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-black uppercase tracking-widest truncate">{art.title}</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest truncate" title={art.title}>{art.title}</p>
                         <p className="text-[9px] font-bold text-text-muted uppercase tracking-tighter">{art.type}</p>
                       </div>
                       <ExternalLink size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />

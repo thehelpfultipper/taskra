@@ -322,7 +322,7 @@ export async function handleMarketTask(
       supabase.from("agents").select("id,owner_user_id,handle").eq("id", message.agentId).single(),
       supabase
         .from("jobs")
-        .select("id,org_id,created_by_user_id,title,description,status")
+        .select("id,org_id,created_by_user_id,title,description,status,employer_kind,employer_agent_id,engagement_type")
         .eq("id", message.jobId)
         .single(),
     ]);
@@ -340,11 +340,18 @@ export async function handleMarketTask(
       title: string;
       description: string;
       status: string;
+      employer_kind: "org" | "agent";
+      employer_agent_id: string | null;
+      engagement_type: "role" | "subcontract" | "advisory";
     };
 
-    const isCreator = job.created_by_user_id === recruiterAgent.owner_user_id;
-    let canScreen = isCreator;
-    if (!canScreen) {
+    let canScreen: boolean;
+    if (job.employer_kind === "agent") {
+      // Agent-employer sub-contracts are screened by the employing agent itself.
+      canScreen = job.employer_agent_id === recruiterAgent.id;
+    } else if (job.created_by_user_id === recruiterAgent.owner_user_id) {
+      canScreen = true;
+    } else {
       const membershipResult = await supabase
         .from("org_memberships")
         .select("id")
@@ -515,18 +522,60 @@ export async function handleMarketTask(
       throw new Error(`Failed to insert screening status history: ${historyInsert.error.message}`);
     }
 
+    // An agent-employer commits one sub-contractor: promote a single shortlist to hired.
+    let contractedHire = false;
+    if (nextStatus === "shortlisted" && job.employer_kind === "agent" && job.engagement_type === "subcontract") {
+      const filledResult = await supabase
+        .from("applications")
+        .select("id", { count: "exact", head: true })
+        .eq("job_id", job.id)
+        .eq("current_status", "hired");
+      if (filledResult.error) {
+        throw new Error(`Failed to check hired applications: ${filledResult.error.message}`);
+      }
+      if ((filledResult.count ?? 0) === 0) {
+        const hireResult = await supabase
+          .from("applications")
+          .update({ current_status: "hired" })
+          .eq("id", application.id)
+          .eq("current_status", "shortlisted")
+          .select("id")
+          .maybeSingle();
+        if (hireResult.error) {
+          throw new Error(`Failed to contract sub-contractor: ${hireResult.error.message}`);
+        }
+        if (hireResult.data) {
+          contractedHire = true;
+          const hireHistory = await supabase.from("application_status_history").insert({
+            application_id: application.id,
+            from_status: "shortlisted",
+            to_status: "hired",
+            changed_by_user_id: null,
+            changed_by_source: "worker",
+            note: `Agent employer @${recruiterAgent.handle} contracted this peer for sub-contract "${job.title}".`,
+          });
+          if (hireHistory.error) {
+            throw new Error(`Failed to insert hire status history: ${hireHistory.error.message}`);
+          }
+        }
+      }
+    }
+
     await upsertDecisionEvent(supabase, {
       id: context.taskRunId,
       agentId: recruiterAgent.id,
       actionFamily: "recruiter_screening",
       decisionOutcome: "executed",
-      rationale: `Screened application using deterministic checks (${screeningScore}/${screeningThreshold}).`,
+      rationale: contractedHire
+        ? `Screened (${screeningScore}/${screeningThreshold}) and contracted the shortlisted peer for this sub-contract.`
+        : `Screened application using deterministic checks (${screeningScore}/${screeningThreshold}).`,
       contextDigest: {
         phase: "screening",
-        result: "screened",
+        result: contractedHire ? "contracted" : "screened",
         applicationId: application.id,
         applicantAgentId: application.applicant_agent_id,
-        nextStatus,
+        nextStatus: contractedHire ? "hired" : nextStatus,
+        employerKind: job.employer_kind,
         checks: {
           hasCoverNote,
           applicantOpenToWork,
@@ -542,7 +591,7 @@ export async function handleMarketTask(
       action: message.action,
       decisionOutcome: "executed",
       applicationId: application.id,
-      nextStatus,
+      nextStatus: contractedHire ? "hired" : nextStatus,
     };
   }
 

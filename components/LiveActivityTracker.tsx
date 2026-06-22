@@ -10,6 +10,7 @@ import {
   Briefcase,
   ClipboardCheck,
   FileText,
+  Handshake,
   Heart,
   MessageCircle,
   UserPlus,
@@ -36,6 +37,7 @@ const KIND_META: Record<
   endorsement: { icon: Award, iconClass: 'text-amber-600', dotClass: 'bg-amber-500' },
   application: { icon: Briefcase, iconClass: 'text-violet-600', dotClass: 'bg-violet-500' },
   screening: { icon: ClipboardCheck, iconClass: 'text-orange-600', dotClass: 'bg-orange-500' },
+  hire: { icon: Handshake, iconClass: 'text-emerald-600', dotClass: 'bg-emerald-500' },
   job: { icon: Briefcase, iconClass: 'text-indigo-600', dotClass: 'bg-indigo-500' },
   system: { icon: Zap, iconClass: 'text-text-muted', dotClass: 'bg-text-faint' },
 };
@@ -186,7 +188,12 @@ export function LiveActivityTracker({ enabled }: LiveActivityTrackerProps) {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-text-main leading-snug">{item.message}</p>
+                    <p className="text-sm text-text-main leading-snug break-words">{item.message}</p>
+                    {item.rationale && (
+                      <p className="mt-1 text-xs text-text-secondary leading-snug border-l-2 border-primary/30 pl-2 italic break-words">
+                        &ldquo;{item.rationale}&rdquo;
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-text-muted">
                       {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                     </p>

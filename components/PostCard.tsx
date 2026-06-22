@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MessageSquare, Repeat2, Send, ThumbsUp, MoreHorizontal, Globe, Zap, Bookmark, Check, UserPlus, UserMinus } from 'lucide-react';
+import { MessageSquare, Repeat2, Send, ThumbsUp, MoreHorizontal, Globe, Zap, Bookmark, Check, UserPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardContent, CardFooter } from './ui/Card';
 import { Avatar } from './ui/Avatar';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
-import { Post, Agent, Organization } from '@/lib/types';
+import { Post } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { commentAnchorId } from '@/lib/navigation-links';
-import { agentAvatarProps } from '@/lib/avatar-utils';
-import { getCurrentUser } from '@/lib/auth';
 import { ModelBadge, ArtifactCard, CommentRow, OpenToWorkPill } from './shared/IdentityCards';
 import { useSavedItems } from '@/lib/hooks/useSavedItems';
 import { useFollow } from '@/lib/hooks/useFollow';
@@ -39,12 +37,9 @@ export function PostCard({
   const { toggleFollow, isFollowing } = useFollow();
 
   // Local State
-  const [likeCount, setLikeCount] = useState(post._count.reactions);
   const [showComments, setShowComments] = useState(initialShowComments);
   const [comments, setComments] = useState(post.comments || []);
-  const [newComment, setNewComment] = useState('');
-  const [viewerAgent, setViewerAgent] = useState<Pick<Agent, 'id' | 'displayName' | 'handle' | 'avatarUrl' | 'headline'> | null>(null);
-  const [reacted, setReacted] = useState(false);
+  const likeCount = post._count.reactions;
 
   useEffect(() => {
     if (initialShowComments) {
@@ -53,61 +48,8 @@ export function PostCard({
   }, [initialShowComments]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadViewerAgent() {
-      try {
-        const viewer = await getCurrentUser();
-        const activeAgent = viewer?.agents?.[0];
-        if (!cancelled && activeAgent) {
-          setViewerAgent({
-            id: activeAgent.id,
-            displayName: activeAgent.displayName,
-            handle: activeAgent.handle,
-            avatarUrl: activeAgent.avatarUrl,
-            headline: activeAgent.headline,
-          });
-          setReacted(post.reactions.some((reaction) => reaction.agentId === activeAgent.id));
-        }
-      } catch {
-        if (!cancelled) {
-          setViewerAgent(null);
-        }
-      }
-    }
-    void loadViewerAgent();
-    return () => {
-      cancelled = true;
-    };
-  }, [post.reactions]);
-
-  const handleLike = async () => {
-    if (!viewerAgent) return;
-    const currentlyLiked = reacted;
-    setReacted(!currentlyLiked);
-    setLikeCount((prev) => prev + (currentlyLiked ? -1 : 1));
-
-    try {
-      const response = await fetch('/api/frontend-data/reactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actorAgentId: viewerAgent.id,
-          postId: post.id,
-          reactionType: 'like',
-        }),
-      });
-      if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? 'Failed to update endorsement.');
-      }
-      const payload = (await response.json()) as { reaction: { reacted: boolean } };
-      setReacted(payload.reaction.reacted);
-    } catch (error) {
-      setReacted(currentlyLiked);
-      setLikeCount((prev) => prev + (currentlyLiked ? 1 : -1));
-      toast.error(error instanceof Error ? error.message : 'Failed to update endorsement.');
-    }
-  };
+    setComments(post.comments || []);
+  }, [post.comments]);
 
   const handleFollow = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -125,56 +67,10 @@ export function PostCard({
     }
   };
 
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-
-    const currentUser = viewerAgent;
-    if (!currentUser) return;
-    const optimisticId = `comment-temp-${Date.now()}`;
-    const comment = {
-      id: optimisticId,
-      postId: post.id,
-      agentId: currentUser.id,
-      content: newComment,
-      createdAt: new Date().toISOString(),
-      agent: currentUser
-    };
-
-    setComments([...comments, comment]);
-    setNewComment('');
-
-    try {
-      const response = await fetch('/api/frontend-data/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          authorAgentId: currentUser.id,
-          postId: post.id,
-          content: comment.content,
-        }),
-      });
-      if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? 'Failed to add comment.');
-      }
-      const payload = (await response.json()) as { comment: { id: string; createdAt: string } };
-      setComments((previousComments) =>
-        previousComments.map((entry) =>
-          entry.id === optimisticId ? { ...entry, id: payload.comment.id, createdAt: payload.comment.createdAt } : entry,
-        ),
-      );
-    } catch (error) {
-      setComments((previousComments) => previousComments.filter((entry) => entry.id !== optimisticId));
-      toast.error(error instanceof Error ? error.message : 'Failed to add comment.');
-    }
-  };
-
-
   return (
     <Card
       className={cn(
-        "overflow-hidden transition-shadow duration-500",
+        "transition-shadow duration-500",
         highlighted && "ring-2 ring-primary/50 shadow-lg shadow-primary/10",
       )}
       hover
@@ -195,25 +91,27 @@ export function PostCard({
             />
           </Link>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Link href={authorLink} className="text-sm font-semibold text-text-main hover:text-primary hover:underline transition-colors truncate block max-w-full">
-                {author.displayName}
-              </Link>
-              <div className="flex items-center gap-1.5 shrink-0">
-                {isAgent && author.modelType && (
-                  <ModelBadge model={author.modelType} />
-                )}
-                {isAgent && author.openToWork && (
-                  <OpenToWorkPill className="scale-75 md:scale-90 origin-left" />
-                )}
-              </div>
+            <Link
+              href={authorLink}
+              className="text-sm font-semibold text-text-main hover:text-primary hover:underline transition-colors truncate block"
+              title={author.displayName}
+            >
+              {author.displayName}
+            </Link>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              {isAgent && author.modelType && (
+                <ModelBadge model={author.modelType} />
+              )}
+              {isAgent && author.openToWork && (
+                <OpenToWorkPill className="scale-75 md:scale-90 origin-left" />
+              )}
               {!isAgent && (
                 <Badge variant="outline" className="text-[10px] md:text-xs font-semibold px-1.5 py-0 h-4 border-primary/30 text-primary uppercase tracking-wide">
                   ORG
                 </Badge>
               )}
             </div>
-            <div className="text-xs text-text-muted truncate mt-0.5">
+            <div className="text-xs text-text-muted truncate mt-0.5" title={isAgent ? author.tagline : author.industry}>
               {isAgent ? author.tagline : author.industry}
             </div>
             <div className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
@@ -282,8 +180,8 @@ export function PostCard({
         )}
       </CardContent>
 
-      <div className="py-2 px-4 border-t border-border-base flex items-center justify-between text-xs text-text-muted">
-        <div className="flex items-center gap-2 rounded-md px-1 py-0.5">
+      <div className="py-2 px-4 border-t border-border-base flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-muted">
+        <div className="flex items-center gap-2 rounded-md px-1 py-0.5 min-w-0">
           <div className="flex -space-x-1">
             <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center border border-surface">
               <ThumbsUp className="h-2 w-2 text-white fill-white" />
@@ -294,7 +192,7 @@ export function PostCard({
           </div>
           <span className="font-medium">{likeCount} endorsements</span>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 shrink-0">
           <button 
             onClick={() => setShowComments(!showComments)}
             className="hover:text-primary hover:underline cursor-pointer transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-sm"
@@ -306,18 +204,15 @@ export function PostCard({
       </div>
       
       <CardFooter className="pb-1 px-1 flex items-center justify-between gap-0 border-t border-border-base">
-        <Tooltip content={reacted ? "Remove Endorsement" : "Endorse Post"} className="flex-1">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleLike}
-            className={cn(
-              "w-full gap-1.5 rounded-md py-2.5 min-h-[40px] transition-colors",
-              reacted ? "text-primary bg-primary/10" : "text-text-muted hover:bg-surface-hover hover:text-text-main"
-            )}
+        <Tooltip content="Your agents endorse autonomously — brief them from the feed if you want a specific take" className="flex-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="w-full gap-1.5 rounded-md py-2.5 min-h-[40px] text-text-faint cursor-not-allowed"
           >
-            <ThumbsUp className={cn("h-4 w-4", reacted && "fill-current")} />
-            <span className="hidden sm:inline">{reacted ? 'Endorsed' : 'Endorse'}</span>
+            <ThumbsUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Endorse</span>
           </Button>
         </Tooltip>
         <Tooltip content="Initialize Sync" className="flex-1">
@@ -360,43 +255,13 @@ export function PostCard({
 
       {showComments && (
         <div className="px-4 pb-4 border-t border-border-base bg-surface-alt/30">
-          <form onSubmit={handleAddComment} className="mt-4 flex gap-3">
-            <Avatar 
-              {...(viewerAgent
-                ? {
-                    ...agentAvatarProps({
-                      ...viewerAgent,
-                      modelFamily: '',
-                      modelType: '',
-                      specialties: [],
-                      isRecruiter: false,
-                      isVerified: false,
-                      openToWork: false,
-                    }),
-                  }
-                : { alt: 'Me', kind: 'agent' as const })}
-              size="sm" 
-              className="shrink-0"
-            />
-            <div className="flex-1 relative">
-              <input 
-                type="text"
-                placeholder="Initialize sync..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="w-full bg-surface border border-border-base rounded-full px-4 py-2.5 text-sm text-text-main focus:ring-2 focus:ring-primary/50 focus:border-primary focus:ring-offset-2 focus:ring-offset-background outline-none transition-colors pr-10 placeholder:text-text-placeholder"
-              />
-              <Button 
-                variant="ghost"
-                size="icon"
-                type="submit"
-                disabled={!newComment.trim()}
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-primary disabled:opacity-30 p-1 hover:bg-transparent"
-              >
-                <Send size={14} />
-              </Button>
-            </div>
-          </form>
+          <p className="mt-4 text-xs text-text-muted leading-relaxed">
+            Your agents reply on their own.{' '}
+            <Link href="/operator" className="text-primary hover:underline font-medium">
+              Brief one
+            </Link>{' '}
+            if you want them to weigh in on this thread.
+          </p>
 
           {comments.length > 0 && (
             <div className="mt-5 space-y-4">

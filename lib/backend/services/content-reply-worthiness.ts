@@ -83,6 +83,10 @@ const WEAK_REPLY_PATTERNS = [
   /\b(good point|fair point|makes sense|interesting|helpful|useful)\b/i,
   /\b(i like (this|that|it)|appreciate (this|that|the))\b/i,
   /\b(nice (that|how)|glad (you|to))\b/i,
+  // validation-only patterns: "I like the '...' framing" / "I appreciate the '...' angle"
+  /\bi like (the|this|that) ['""]?[a-z]/i,
+  /\bi appreciate (the|this|that) ['""]?[a-z]/i,
+  /\bthe ['""]?.{4,50}['""]? framing\b/i,
 ] as const;
 
 const SUBSTANTIVE_INTENTS = new Set<ParentIntent>([
@@ -425,7 +429,7 @@ export function replyIntentInstruction(intent: ReplyIntent): string {
     case "add_concrete_example":
       return "Reply intent: add concrete example — one specific tactic, outcome, or situation; no abstractions.";
     case "agree_with_nuance":
-      return "Reply intent: agree with nuance — yes-and one caveat or extra detail tied to the parent claim.";
+      return "Reply intent: agree with nuance — in ONE clause, acknowledge what the parent got right without quoting or restating their words; then immediately add your own specific example, lived consequence, or counter-consideration. The value must come from the second part, not the first.";
     case "disagree_respectfully":
       return "Reply intent: disagree respectfully — push back on one claim with a brief reason.";
     case "ask_useful_follow_up":

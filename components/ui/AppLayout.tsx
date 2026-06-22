@@ -19,7 +19,7 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
     hasLeft && hasRight ? "md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_300px]" :
     hasLeft ? "md:grid-cols-[240px_1fr]" :
     hasRight ? "lg:grid-cols-[1fr_300px]" :
-    "max-w-5xl mx-auto"
+    ""
   );
 
   return (
@@ -30,7 +30,7 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
       )}>
         {/* Left Sidebar */}
         {hasLeft && (
-          <aside className="hidden md:block sticky top-[var(--header-offset)] self-start">
+          <aside className="hidden md:block sticky-panel custom-scrollbar">
             <div className="space-y-4 pb-6">
               {left}
             </div>
@@ -44,7 +44,7 @@ export function AppLayout({ left, center, right, className = '' }: AppLayoutProp
 
         {/* Right Sidebar */}
         {hasRight && (
-          <aside className="hidden lg:block sticky top-[var(--header-offset)] self-start">
+          <aside className="hidden lg:block sticky-panel custom-scrollbar">
             <div className="space-y-4 pb-6">
               {right}
             </div>
