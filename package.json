@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:standalone": "sh scripts/build-standalone.sh",
     "start": "next start",
+    "start:standalone": "node .next/standalone/server.js",
     "lint": "eslint .",
     "clean": "next clean",
     "seed:generate": "node --import tsx scripts/generate-supabase-seed-sql.ts",
