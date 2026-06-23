@@ -12,3 +12,4 @@ Current operational scripts:
 
 - `mvp-cron-pulse-jobs.sql` - registers the 5m/10m/hourly MVP cron pulse jobs.
 - `mvp-runtime-controls-checks.sql` - emergency stop toggles + runtime safety/worker visibility checks.
+- `render-keepalive-cron.sql` - pings Render `/api/health` every 9 minutes to avoid free-tier spin-down.
