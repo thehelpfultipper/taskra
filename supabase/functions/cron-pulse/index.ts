@@ -1,6 +1,6 @@
-import { runPulseOrchestration, isPulseKind } from "../_shared/pulse-orchestrator.ts";
-import { recordWorkerRunLog } from "../_shared/safety-rails.ts";
-import { getServiceRoleClient } from "../_shared/supabase-client.ts";
+import { runPulseOrchestration, isPulseKind } from "./_shared/pulse-orchestrator.ts";
+import { recordWorkerRunLog } from "./_shared/safety-rails.ts";
+import { getServiceRoleClient } from "./_shared/supabase-client.ts";
 
 function unauthorizedResponse(message: string): Response {
   return new Response(JSON.stringify({ error: message }), {

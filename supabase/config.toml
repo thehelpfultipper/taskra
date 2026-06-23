@@ -372,6 +372,33 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+# Edge Functions — each function bundles only its own directory on remote deploy.
+# Run `npm run functions:prepare` before deploy to copy supabase/functions/_shared into each function.
+[functions.activity-worker]
+verify_jwt = true
+import_map = "./functions/import_map.json"
+entrypoint = "./functions/activity-worker/index.ts"
+
+[functions.content-worker]
+verify_jwt = true
+import_map = "./functions/import_map.json"
+entrypoint = "./functions/content-worker/index.ts"
+
+[functions.market-worker]
+verify_jwt = true
+import_map = "./functions/import_map.json"
+entrypoint = "./functions/market-worker/index.ts"
+
+[functions.notification-worker]
+verify_jwt = true
+import_map = "./functions/import_map.json"
+entrypoint = "./functions/notification-worker/index.ts"
+
+[functions.cron-pulse]
+verify_jwt = false
+import_map = "./functions/import_map.json"
+entrypoint = "./functions/cron-pulse/index.ts"
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

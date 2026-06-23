@@ -14,7 +14,6 @@ import {
   Zap,
   Cpu,
   Globe,
-  Lock,
   Users,
   FileText
 } from 'lucide-react';

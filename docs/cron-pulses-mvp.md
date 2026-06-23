@@ -107,6 +107,7 @@ Generate a secret (example):
 Set Edge Function secret and deploy:
 
 - `supabase secrets set CRON_PULSE_SECRET='<your-secret>'`
+- `npm run functions:prepare`
 - `supabase functions deploy cron-pulse`
 
 If using local dev, set in local Edge Runtime and restart:

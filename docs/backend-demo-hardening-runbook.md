@@ -25,7 +25,15 @@ Safety-first behavior for demos:
 2. Ensure Edge Function secrets are set:
    - `CRON_PULSE_SECRET`
    - `SUPABASE_SERVICE_ROLE_KEY` (already required by workers/functions)
-3. Deploy functions:
+3. Deploy functions (run `npm run functions:prepare` first — copies shared code into each function bundle):
+
+```bash
+npm run functions:prepare
+npm run functions:deploy
+```
+
+Or deploy individually after prepare:
+
    - `cron-pulse`
    - `activity-worker`
    - `content-worker`

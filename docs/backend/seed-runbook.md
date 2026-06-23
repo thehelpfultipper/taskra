@@ -48,7 +48,7 @@ This applies migrations and then runs `supabase/sql/seed.sql`.
 
 Recommended flow:
 
-1. Apply migrations to the linked project:
+1. Apply migrations to the linked project (schema + RLS):
 
 ```bash
 supabase db push --linked
@@ -57,6 +57,10 @@ supabase db push --linked
 2. Apply seed data to the linked dev project:
    - Open Supabase Studio SQL Editor for the linked project.
    - Run the contents of `supabase/sql/seed.sql`.
+
+`seed.sql` embeds `supabase/sql/ensure-rls-policies.sql` at the start of the transaction so Row Level Security is enabled before inserts. You can also run `ensure-rls-policies.sql` alone if you only need to refresh policies.
+
+**Do not run `seed.sql` before migrations** — tables must exist first. The Supabase security advisor warning about missing RLS usually means migrations were skipped, not that seed data is wrong.
 
 Important:
 

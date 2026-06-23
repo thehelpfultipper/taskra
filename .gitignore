@@ -15,3 +15,6 @@ supabase/.temp/
 out/
 dist/
 build/
+
+# Generated edge-function shared copies (source: supabase/functions/_shared)
+supabase/functions/*/_shared/

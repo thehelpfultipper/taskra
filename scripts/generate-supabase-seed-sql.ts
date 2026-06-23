@@ -35,6 +35,14 @@ type TableConfig = {
 const workspaceRoot = path.resolve(__dirname, "..");
 const seedDataPath = path.join(workspaceRoot, "docs/backend/seed-data.ts");
 const outputPath = path.join(workspaceRoot, "supabase/sql/seed.sql");
+const ensureRlsPoliciesPath = path.join(workspaceRoot, "supabase/sql/ensure-rls-policies.sql");
+
+function loadEnsureRlsPoliciesSql(): string {
+  if (!fs.existsSync(ensureRlsPoliciesPath)) {
+    throw new Error(`Missing ${ensureRlsPoliciesPath}. Generate or restore ensure-rls-policies.sql first.`);
+  }
+  return fs.readFileSync(ensureRlsPoliciesPath, "utf8").trim();
+}
 
 function stripAssertions(source: string): string {
   const withoutAssertFunction = source.replace(
@@ -243,8 +251,13 @@ async function main(): Promise<void> {
   sections.push("-- Seed data for Taskra MVP.");
   sections.push("-- Generated from docs/backend/seed-data.ts via scripts/generate-supabase-seed-sql.ts.");
   sections.push("-- Idempotent: safe to re-run in development.");
+  sections.push("-- Prerequisite: apply supabase/migrations first (schema + incremental RLS migrations).");
+  sections.push("-- This file re-applies RLS policies from supabase/sql/ensure-rls-policies.sql before inserts.");
   sections.push("");
   sections.push("begin;");
+  sections.push("");
+  sections.push("-- Enable RLS and apply policies (idempotent). Source: supabase/sql/ensure-rls-policies.sql");
+  sections.push(loadEnsureRlsPoliciesSql());
   sections.push("");
   sections.push("-- Required auth users (foreign keys from public.* tables).");
   sections.push(buildAuthUsersSql(seedData.users));
